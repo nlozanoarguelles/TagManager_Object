@@ -594,7 +594,7 @@ window.TagManager = function(settings) {
 	    }
 
 	    //Se copia la función al objeto TagManager para que se puede utilizar en la definición de datos y en los escuchadores correspondientes
-	    _self.utils[utilInfo.name] = utilInfo.util;
+	    _self.utils[utilInfo.name] = utilInfo.util.bind(_self);
 	}
 
     /**
