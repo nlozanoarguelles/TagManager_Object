@@ -12,6 +12,26 @@ var tagManagerSettings = {
 
         },
         trigger: "ready"
+    },{
+        name: "gaIdAvailable",
+        details: "Evento que se produce cuando el objeto ga devuelve un tracker que permite extraer el id",
+        listener: function() {
+            var _self = this;
+            var gaIdCookie = _self.utils.getCookie('_gaid');
+            if(gaIdCookie){
+                _self.emit("gaIdAvailable",gaIdCookie);
+            }else{
+                if(typeof ga != "undefined"){
+                    
+                    ga(function(tracker) {
+                        utag_data.gaIdCookie =  tracker.get('clientId');
+                        setCookie('_gaid',tracker.get('clientId'),30);
+                        _self.emit("gaIdAvailable",gaIdCookie);
+                    });
+                }
+            }
+        },
+        trigger: "load"
     }],
 
     data: [{
@@ -85,7 +105,7 @@ var tagManagerSettings = {
             var _self = this;
             //Comprobamos si estamos en el path-root
             var isHome = function() {
-                    return document.pathname === "/";
+                    return document.location.pathname === "/";
                 }
                 //Comprobamos si la url actual pertenece a una de las de la cabecera
             var isMainSection = function() {
@@ -122,7 +142,7 @@ var tagManagerSettings = {
             }
         },
         trigger: "ready",
-        priority: 2,
+        priority: 3,
         obligatory: true,
         type: "string"
     }, {
@@ -135,10 +155,14 @@ var tagManagerSettings = {
                     return [_self.data.constants.pageType.TYPE_HOME];
                     break;
                 case _self.data.constants.pageType.TYPE_MAIN_SECTION:
-                    return _self.data.configuration.pathArray.unshift(_self.data.constants.pageType.TYPE_MAIN_SECTION);
+                    var pathArray = _self.data.configuration.pathArray.slice();
+                    pathArray.unshift(_self.data.constants.pageType.TYPE_MAIN_SECTION);
+                    return pathArray;
                     break;
                 case _self.data.constants.pageType.TYPE_LANDING:
-                    return _self.data.configuration.pathArray.unshift(_self.data.constants.pageType.TYPE_LANDING);
+                    var pathArray = _self.data.configuration.pathArray.slice();
+                    pathArray.unshift(_self.data.constants.pageType.TYPE_LANDING);
+                    return pathArray;
                     break;
                 case _self.data.constants.pageType.TYPE_BLOG:
                     //Comprobamos si existe el grid de articulos
@@ -154,10 +178,61 @@ var tagManagerSettings = {
             }
         },
         trigger: "ready",
-        priority: 1,
+        priority: 2,
         obligatory: true,
         type: "array"
     }, {
+        name: "digitalProcess.pageName",
+        details: "Nombre de página formado por la concatenación de las secciones unidas por el separador :",
+        extractor: function() {
+            var _self = this,
+                numberSections = _self.data.digitalProcess.sections.length,
+                pageName = '';
+            for(var i = 0; i < numberSections - 1;i++){
+                pageName += _self.data.digitalProcess.sections[i] + ':';
+            }
+            pageName += _self.data.digitalProcess.sections[i];
+            return pageName;
+        },
+        trigger: "ready",
+        priority: 1,
+        obligatory: true,
+        type: "string"
+    }, {
+        name: "userInfo.ids.tealiumIqId",
+        details: "Es el id usado por Tealium IQ para identificar el usuario o el parámetro \"tuuid\" pasado como parámetro (tiene prioridad el parámetro)",
+        extractor: function() {
+            var _self = this;
+            var tuuidParameter = _self.utils.getParameterByName('tuuid');
+            if (tuuidParameter) {
+                _self.utils.setCookie('tuuid', tuuidParameter, 30);
+                return tuuidParameter;
+            } else if (_self.utils.getCookie("tuuid")) {
+                return _self.utils.getCookie('tuuid');
+            } else {
+                return _self.utils.getCookie("utag_main").match(/v_id:[0-9a-zA-Z]+\$/)[0].replace(/(v_id:|\$)/g, '');
+            }
+        },
+        trigger: "preloader",
+        type: "string"
+    }, {
+        name: "userInfo.ids.mc4wpEmail",
+        details: "ID de usuario vinculado al email de suscripción",
+        extractor: function() {
+            var _self = this;
+            return _self.utils.getCookie("mc4wp_email");
+        },
+        trigger: "preloader",
+        type: "string"
+    }, {
+        name: "userInfo.ids.gaId",
+        details: "ID de usuario extraido de la cookie de Google Analytics",
+        extractor: function(gaId) {
+            return gaId;
+        },
+        trigger: "gaIdAvailable",
+        type: "string"
+    },{
         name: "pageContent.postTitle",
         details: "Contiene el título asociada al post que se está visualizando",
         extractor: function() {
@@ -263,8 +338,12 @@ var tagManagerSettings = {
     }, {
         name: "urlParser",
         util: function(url) {
+            var urlSlashs = url;
+            if(!url.match(/(\/\?|\/$)/)){
+                urlSlashs = url.indexOf('?') > 0 ? url.replace('?','/?') : (url + "/");
+            }
             var parser = document.createElement('a');
-            parser.href = url;
+            parser.href = urlSlashs;
             return parser;
         }
     }, {
@@ -346,5 +425,15 @@ var tagManagerSettings = {
             strTransform = _self.utils.trim(strTransform);
             return strTransform;
         }
+    },{
+        name: "getParameterByName",
+        util: function(name) {
+            name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+            var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+                results = regex.exec(location.search);
+            return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+        }
     }]
-}
+};
+
+window.tagManager = new TagManager(tagManagerSettings);
