@@ -248,18 +248,20 @@ window.TagManager = function(settings) {
      * Comprueba si dentro de un objeto existe una clave con un tipo específico
      * @param  {object} Objeto en el que se va a mirar
      * @param  {string} Clave que se va a comprobar dentro del objeto
-     * @param  {string}	Tipo de la variable que se va a mirar	
+     * @param  {Array}	Tipo de la variable que se va a mirar	
      * @return {boolean} True si la variable dentro del objeto tiene el tipo correcto, false si no
      */
     _self.utils.checkExistanceType = function(obj, key, varType){
-    	if((obj && typeof obj === 'object') && (key && typeof key === 'string') && (varType && typeof varType === 'string')){
-    		if(obj[key] && typeof obj[key] === varType){
-    			return true;
-    		}else{
-    			return false;
-    		}
+    	if((obj && typeof obj === 'object') && (key && typeof key === 'string') && (varType && Array.isArray(varType))){
+    		var correctType = false;
+            for(var i = 0; i < varType.length; i++){
+                if(obj[key] && typeof obj[key] === varType[i]){
+                    correctType = true;
+                }
+            }
+            return correctType;
     	}else{
-    		_self.error("Error[utils.checkExistanceType] The parameters received must be [object, string, string]");
+    		_self.error("Error[utils.checkExistanceType] The parameters received must be [object, Array, string]");
     	}
     }
 
@@ -313,8 +315,9 @@ window.TagManager = function(settings) {
 		_self.obligatoryData.dataReference.push({name: dataName, filled: false});
 		_self.obligatoryData.dataLeft++;
 
+        var succesEventName = 'dataFilled.' + dataName;
 		//TO-DO: Modifcar esta parte para unificarlo con un factory
-		_self.on(['dataFilled',dataName],function(){
+		_self.on(succesEventName,function(){
 			_self.utils.find(_self.obligatoryData.dataReference,{name:dataName}).filled = true;
 			_self.obligatoryData.dataLeft--;
 			if(_self.obligatoryData.dataLeft == 0){
@@ -322,7 +325,9 @@ window.TagManager = function(settings) {
 			}
 			
 		});
-		_self.on(['dataFilledError',dataName],function(){
+
+        var errorEventName = 'dataFilledError.' + dataName;
+		_self.on(errorEventName,function(){
 			_self.utils.find(_self.obligatoryData.dataReference,{name:dataName}).filled = "error";
 			_self.obligatoryData.dataLeft--;
 			if(_self.obligatoryData.dataLeft == 0){
@@ -369,6 +374,36 @@ window.TagManager = function(settings) {
 		
 	}
 
+    _self.utils.isObject = function(variable){
+        return (typeof variable == "object" && !Array.isArray(variable));
+    }
+
+    _self.utils.objectToArray = function(obj){
+        var arrayResult = [];
+        
+        function keyValueAnalyzer(key,value){
+            if(_self.utils.isObject(value)){
+                objAnalyzer(value,key);        
+            }else{
+                arrayResult.push([key,value]);    
+            }
+        }
+        
+        function objAnalyzer(objToAnalyze,preName){
+            for(var i in objToAnalyze){
+                var key = i;
+                if(preName){
+                    key = preName + '.' + key;
+                }
+
+                keyValueAnalyzer(key,objToAnalyze[i]);
+            }
+            
+        }
+        objAnalyzer(obj);
+        return arrayResult;
+    }
+
     /**
      * Permite añadir al objeto TagManager el data indicado en el objeto que lo describe
      * @param {[Object]} Se debe pasar un objeto con las siguientes claves:
@@ -387,14 +422,14 @@ window.TagManager = function(settings) {
 			var dataInfoChecker =  function(dataInfo){
 				var obligatoryData = [{
 					key: "name",
-					type: "string"
+					type: ["string"]
 				},{
 					key: "extractor",
-					type: "function"
+					type: ["function"]
 				},{
 					key: "trigger",
-					type: "string"
-				},];
+					type: ["string","object"]
+				}];
 
 				for(var i = 0; i < obligatoryData.length; i++){
 					if(!_self.utils.checkExistanceType(dataInfo,obligatoryData[i].key,obligatoryData[i].type)){
@@ -410,11 +445,13 @@ window.TagManager = function(settings) {
 					var dataListenerSetter = function(){
 						try{
 							nameSetter(dataInfo.extractor.apply(_self,arguments));
-							_self.emit(['dataFilled',dataInfo.name],_self.utils.getDataValueFromName(dataInfo.name));
+                            var succesEventName = 'dataFilled.' + dataInfo.name;
+							_self.emit(succesEventName,_self.utils.getDataValueFromName(dataInfo.name));
 							
 						}catch(e){
+                            var errorEventName = 'dataFilledError.' + dataInfo.name;
 							_self.error(e, "Error[addData] while setting the value");
-							_self.emit(['dataFilledError',dataInfo.name]);
+							_self.emit(errorEventName);
 						}
 					};
 					if(dataInfo.obligatory){
@@ -423,44 +460,54 @@ window.TagManager = function(settings) {
 							_self.utils.addObligatoryData(dataInfo.name);
 						}
 					}
-					if(dataInfo.priority && dataInfo.priority === "max"){
-						var triggerListeners = _self.listeners(dataInfo.trigger);
-						triggerListeners.unshift(dataListenerSetter);
-					}else{
-						var priorityNumber = parseInt(dataInfo.priority);
-						if(isNaN(priorityNumber) || priorityNumber < 0){
-							priorityNumber = 0;
-						}
-						var priorityName = "priority-"+priorityNumber;
-						if(!_self.events[dataInfo.trigger]){
-							_self.events[dataInfo.trigger] = {};
-							_self.on(dataInfo.trigger,function(){
-								var argumentsEmitter = arguments || [];
-								var priorityArray = Object.keys(_self.events[dataInfo.trigger]);
-								priorityArray.sort(function(a,b){
-									var getIndexNumber=function(priorityText){
-										return parseInt(priorityText.replace('priority-',''));
-									};
-									a = getIndexNumber(a);
-									b = getIndexNumber(b);
-									return b - a;
-								});
-								priorityArray.forEach( function(element) {
-									var argumentsEmitterPriority = [[dataInfo.trigger,element]];
-									for(var i = 0; i < argumentsEmitter.length; i++){
-										argumentsEmitterPriority.push(argumentsEmitter[i]);
-									}
 
-									_self.emit.apply(_self,argumentsEmitterPriority);
-								});
-							});
-						}
-						_self.events[dataInfo.trigger][priorityName] = _self.events[dataInfo.trigger][priorityName] || [];
-						_self.events[dataInfo.trigger][priorityName].push(dataInfo.name);
+					if(!Array.isArray(dataInfo.trigger)){
+                        dataInfo.trigger = [dataInfo.trigger];
+                    }
+                    for(var i = 0; i < dataInfo.trigger.length; i++){
 
-						_self.on([dataInfo.trigger,priorityName], dataListenerSetter);
-					}
-					
+                        if (dataInfo.priority && dataInfo.priority === "max") {
+                            var triggerListeners = _self.listeners(dataInfo.trigger[i]);
+                            triggerListeners.unshift(dataListenerSetter);
+                        } else {
+                            var priorityNumber = parseInt(dataInfo.priority);
+                            if (isNaN(priorityNumber) || priorityNumber < 0) {
+                                priorityNumber = 0;
+                            }
+                            var priorityName = "priority-" + priorityNumber;
+                            if (!_self.events[dataInfo.trigger[i]]) {
+                                _self.events[dataInfo.trigger[i]] = {};
+                                _self.on(dataInfo.trigger[i], (function(i){
+                                    return function() {
+                                        var argumentsEmitter = arguments || [];
+                                        var priorityArray = Object.keys(_self.events[dataInfo.trigger[i]]);
+                                        priorityArray.sort(function(a, b) {
+                                            var getIndexNumber = function(priorityText) {
+                                                return parseInt(priorityText.replace('priority-', ''));
+                                            };
+                                            a = getIndexNumber(a);
+                                            b = getIndexNumber(b);
+                                            return b - a;
+                                        });
+                                        priorityArray.forEach(function(element) {
+                                            var eventName = dataInfo.trigger[i] + '.' + element;
+                                            var argumentsEmitterPriority = [eventName];
+                                            for (var j = 0; j < argumentsEmitter.length; j++) {
+                                                argumentsEmitterPriority.push(argumentsEmitter[j]);
+                                            }                                           
+                                            _self.emit.apply(_self, argumentsEmitterPriority);
+                                        });
+                                    }
+                                })(i));
+                            }
+                            var eventName = dataInfo.trigger[i] + '.' + priorityName;
+                            _self.events[dataInfo.trigger[i]][priorityName] = _self.events[dataInfo.trigger[i]][priorityName] || [];
+                            _self.events[dataInfo.trigger[i]][priorityName].push(dataInfo.name);
+
+                            _self.on(eventName, dataListenerSetter);
+                        }
+                    }
+
 				}else{
 					_self.error("Error[addData] The name specified for the data is not valid:" + dataInfo.name);
 					return;
@@ -484,7 +531,7 @@ window.TagManager = function(settings) {
      * 					     details:[Opcional] string con la explicación de la información de cuando se lanza dicho evento y que información se pasa como parámetros
      * 					     params:[Opcional] string array cada valor del array contiene un identificador del parámetro que se le pasará a los escuchadores. Además este nombre será el que se use para generar un data asociado.
      * 					     trigger:[Obligatorio] string con el evento que producirá que se ejecute el listener
-     * 					     listener:[Obligatorio] function que se suscribirá al evento que desee. A esta función se le pasará como parámetro una referencia al objeto TagManager.
+     *                       listener:[Obligatorio] function que se suscribirá al evento que desee. A esta función se le pasará como parámetro una referencia al objeto TagManager.
      * 					 }
      */
 	_self.addEvent = function(eventInfo) {
@@ -492,14 +539,14 @@ window.TagManager = function(settings) {
 			var eventInfoChecker =  function(eventInfo){
 				var obligatoryData = [{
 					key: "name",
-					type: "string"
+					type: ["string"]
 				},{
 					key: "listener",
-					type: "function"
+					type: ["function"]
 				},{
 					key: "trigger",
-					type: "string"
-				},];
+					type: ["string","object"]
+				}];
 
 				for(var i = 0; i < obligatoryData.length; i++){
 					if(!_self.utils.checkExistanceType(eventInfo,obligatoryData[i].key,obligatoryData[i].type)){
@@ -539,9 +586,18 @@ window.TagManager = function(settings) {
 			var eventInfoValid = eventInfoChecker(eventInfo);
 			if(eventInfoValid === true){
 				createDataFromEvent(eventInfo);
-				_self.on(eventInfo.trigger,function(){
-					eventInfo.listener.apply(_self,arguments);
-				});
+                if(Array.isArray(eventInfo.trigger)){
+                    for(var i = eventInfo.trigger.length -1; i >= 0; i--){
+                        _self.on(eventInfo.trigger[i],function(){
+                            eventInfo.listener.apply(_self,arguments);
+                        });
+                    }
+                }else{
+                    _self.on(eventInfo.trigger,function(){
+                        eventInfo.listener.apply(_self,arguments);
+                    });
+                }
+				
 			}else{
 				_self.error(eventInfoValid);
 				return;
@@ -633,12 +689,86 @@ window.TagManager = function(settings) {
         _self.removeAllListeners()
     };
 
+    var gtmEventParser = function(dataLayerReference){
+        _self.onAny(function(event){
+            if(dataLayerReference){
+                var eventName = event;
+                if(Array.isArray(event)){
+                    eventName = "";
+                    event.forEach( function(element, index) {
+                        eventName += ('.'+ element);
+                    });
+                }
+                dataLayerReference.push({'event': eventName});
+            }
+            
+        });
+    }
+
+    var tealiumParser = function(tealiumObject){
+        var reservedEvents = ["log","errors","dataFilled","dataFilledError","allDataFilled","allDataFilledError","load","ready", "preload",".priority-"];
+        function arrayContainsString (array, stringValue){
+        for (var i = array.length - 1; i >= 0; i--) {
+            if(array[i].indexOf(stringValue) > -1 || stringValue.indexOf(array[i]) > -1){
+                return true;
+            }
+        }
+        return false;
+    }
+        //Parsing events
+        _self.onAny(function(event){
+            var eventName = event;
+            if(Array.isArray(event)){
+                eventName = "";
+                event.forEach( function(element, index) {
+                    eventName += ('.'+ element);
+                });
+            }
+            if(eventName && tealiumObject.link && !arrayContainsString(reservedEvents,eventName)){
+                var eventObject = {'event_name': eventName};
+                var params = [];
+                if(_self.data.events && _self.data.events[eventName]){
+                    var objectKeys = Object.keys(_self.data.events[eventName]);
+                    if(objectKeys.length == arguments.length-1){
+                        eventParams = objectKeys;
+                    }
+                }else{
+                    for(var i = 1; i < arguments.length; i++){
+                        params.push("param-"+i);
+                    }
+                }
+                for(var i = 1; i < arguments.length; i++){
+                    var paramIndex = i - 1;
+                    var eventValue = _self.utils.isObject() ? _self.utils.objectToArray(arguments[i]) : arguments[i];
+                    eventObject[params[paramIndex]] = eventValue;
+
+                }
+                //tealiumObject.link(eventObject);
+            }else if(eventName.indexOf("dataFilled.") > -1){
+                var dataName = eventName.replace("dataFilled.","");
+                tealiumObject.data[dataName] = _self.utils.getDataValueFromName(dataName);
+            }
+
+        });
+
+
+
+    }
+
     /**
     * Da valor a los diferentes elementos que componen el objeto TagManager en función de los datos de inicialización 
     * @param  {tagManagerSettings} Objeto Settings de inicialización del objeto TagManager
     */
     _self.init = function(settings) {
  		if (settings) {
+            if(settings.gtm){
+                var gtmDatalayer = settings.gtmDatalayer || window.dataLayer;
+                gtmEventParser(gtmDatalayer);
+            }
+            if(settings.tealium){
+                var tealiumObject = settings.tealiumObject || window.utag;
+                tealiumParser(tealiumObject);
+            }
         	if (settings.types) {
                 settingsElementsParser('types',settings.types);
             }
@@ -660,7 +790,6 @@ window.TagManager = function(settings) {
         }
         
     };
-
     /*
     * En esta seccion se inicializan las claves del objeto en función del objeto settings pasado en el constructor
     */
@@ -673,5 +802,9 @@ window.TagManager = function(settings) {
 //(function(){"use strict";function t(){}function i(t,n){for(var e=t.length;e--;)if(t[e].listener===n)return e;return-1}function n(e){return function(){return this[e].apply(this,arguments)}}var e=t.prototype,r=this,s=r.EventEmitter;e.getListeners=function(n){var r,e,t=this._getEvents();if(n instanceof RegExp){r={};for(e in t)t.hasOwnProperty(e)&&n.test(e)&&(r[e]=t[e])}else r=t[n]||(t[n]=[]);return r},e.flattenListeners=function(t){var e,n=[];for(e=0;e<t.length;e+=1)n.push(t[e].listener);return n},e.getListenersAsObject=function(n){var e,t=this.getListeners(n);return t instanceof Array&&(e={},e[n]=t),e||t},e.addListener=function(r,e){var t,n=this.getListenersAsObject(r),s="object"==typeof e;for(t in n)n.hasOwnProperty(t)&&-1===i(n[t],e)&&n[t].push(s?e:{listener:e,once:!1});return this},e.on=n("addListener"),e.addOnceListener=function(e,t){return this.addListener(e,{listener:t,once:!0})},e.once=n("addOnceListener"),e.defineEvent=function(e){return this.getListeners(e),this},e.defineEvents=function(t){for(var e=0;e<t.length;e+=1)this.defineEvent(t[e]);return this},e.removeListener=function(r,s){var n,e,t=this.getListenersAsObject(r);for(e in t)t.hasOwnProperty(e)&&(n=i(t[e],s),-1!==n&&t[e].splice(n,1));return this},e.off=n("removeListener"),e.addListeners=function(e,t){return this.manipulateListeners(!1,e,t)},e.removeListeners=function(e,t){return this.manipulateListeners(!0,e,t)},e.manipulateListeners=function(r,t,i){var e,n,s=r?this.removeListener:this.addListener,o=r?this.removeListeners:this.addListeners;if("object"!=typeof t||t instanceof RegExp)for(e=i.length;e--;)s.call(this,t,i[e]);else for(e in t)t.hasOwnProperty(e)&&(n=t[e])&&("function"==typeof n?s.call(this,e,n):o.call(this,e,n));return this},e.removeEvent=function(e){var t,r=typeof e,n=this._getEvents();if("string"===r)delete n[e];else if(e instanceof RegExp)for(t in n)n.hasOwnProperty(t)&&e.test(t)&&delete n[t];else delete this._events;return this},e.removeAllListeners=n("removeEvent"),e.emitEvent=function(r,o){var e,i,t,s,n=this.getListenersAsObject(r);for(t in n)if(n.hasOwnProperty(t))for(i=n[t].length;i--;)e=n[t][i],e.once===!0&&this.removeListener(r,e.listener),s=e.listener.apply(this,o||[]),s===this._getOnceReturnValue()&&this.removeListener(r,e.listener);return this},e.trigger=n("emitEvent"),e.emit=function(e){var t=Array.prototype.slice.call(arguments,1);return this.emitEvent(e,t)},e.setOnceReturnValue=function(e){return this._onceReturnValue=e,this},e._getOnceReturnValue=function(){return this.hasOwnProperty("_onceReturnValue")?this._onceReturnValue:!0},e._getEvents=function(){return this._events||(this._events={})},t.noConflict=function(){return r.EventEmitter=s,t},"function"==typeof define&&define.amd?define(function(){return t}):"object"==typeof module&&module.exports?module.exports=t:r.EventEmitter=t}).call(this);
 !function(e){function t(){this._events={},this._conf&&s.call(this,this._conf)}function s(e){e&&(this._conf=e,e.delimiter&&(this.delimiter=e.delimiter),e.maxListeners&&(this._events.maxListeners=e.maxListeners),e.wildcard&&(this.wildcard=e.wildcard),e.newListener&&(this.newListener=e.newListener),this.wildcard&&(this.listenerTree={}))}function i(e){this._events={},this.newListener=!1,s.call(this,e)}function n(e,t,s,i){if(!s)return[];var r,l,a,h,o,c,f,u=[],p=t.length,_=t[i],v=t[i+1];if(i===p&&s._listeners){if("function"==typeof s._listeners)return e&&e.push(s._listeners),[s];for(r=0,l=s._listeners.length;l>r;r++)e&&e.push(s._listeners[r]);return[s]}if("*"===_||"**"===_||s[_]){if("*"===_){for(a in s)"_listeners"!==a&&s.hasOwnProperty(a)&&(u=u.concat(n(e,t,s[a],i+1)));return u}if("**"===_){f=i+1===p||i+2===p&&"*"===v,f&&s._listeners&&(u=u.concat(n(e,t,s,p)));for(a in s)"_listeners"!==a&&s.hasOwnProperty(a)&&("*"===a||"**"===a?(s[a]._listeners&&!f&&(u=u.concat(n(e,t,s[a],p))),u=u.concat(n(e,t,s[a],i))):u=a===v?u.concat(n(e,t,s[a],i+2)):u.concat(n(e,t,s[a],i)));return u}u=u.concat(n(e,t,s[_],i+1))}if(h=s["*"],h&&n(e,t,h,i+1),o=s["**"])if(p>i){o._listeners&&n(e,t,o,p);for(a in o)"_listeners"!==a&&o.hasOwnProperty(a)&&(a===v?n(e,t,o[a],i+2):a===_?n(e,t,o[a],i+1):(c={},c[a]=o[a],n(e,t,{"**":c},i+1)))}else o._listeners?n(e,t,o,p):o["*"]&&o["*"]._listeners&&n(e,t,o["*"],p);return u}function r(e,t){e="string"==typeof e?e.split(this.delimiter):e.slice();for(var s=0,i=e.length;i>s+1;s++)if("**"===e[s]&&"**"===e[s+1])return;for(var n=this.listenerTree,r=e.shift();r;){if(n[r]||(n[r]={}),n=n[r],0===e.length){if(n._listeners){if("function"==typeof n._listeners)n._listeners=[n._listeners,t];else if(l(n._listeners)&&(n._listeners.push(t),!n._listeners.warned)){var h=a;"undefined"!=typeof this._events.maxListeners&&(h=this._events.maxListeners),h>0&&n._listeners.length>h&&(n._listeners.warned=!0,console.error("(node) warning: possible EventEmitter memory leak detected. %d listeners added. Use emitter.setMaxListeners() to increase limit.",n._listeners.length),console.trace&&console.trace())}}else n._listeners=t;return!0}r=e.shift()}return!0}var l=Array.isArray?Array.isArray:function(e){return"[object Array]"===Object.prototype.toString.call(e)},a=10;i.EventEmitter2=i,i.prototype.delimiter=".",i.prototype.setMaxListeners=function(e){this._events||t.call(this),this._events.maxListeners=e,this._conf||(this._conf={}),this._conf.maxListeners=e},i.prototype.event="",i.prototype.once=function(e,t){return this.many(e,1,t),this},i.prototype.many=function(e,t,s){function i(){0===--t&&n.off(e,i),s.apply(this,arguments)}var n=this;if("function"!=typeof s)throw new Error("many only accepts instances of Function");return i._origin=s,this.on(e,i),n},i.prototype.emit=function(){this._events||t.call(this);var e=arguments[0];if("newListener"===e&&!this.newListener&&!this._events.newListener)return!1;var s,i,r,l,a,h=arguments.length;if(this._all&&this._all.length){if(a=this._all.slice(),h>3)for(s=new Array(h),l=1;h>l;l++)s[l]=arguments[l];for(r=0,i=a.length;i>r;r++)switch(this.event=e,h){case 1:a[r].call(this,e);break;case 2:a[r].call(this,e,arguments[1]);break;case 3:a[r].call(this,e,arguments[1],arguments[2]);break;default:a[r].apply(this,s)}}if(this.wildcard){a=[];var o="string"==typeof e?e.split(this.delimiter):e.slice();n.call(this,a,o,this.listenerTree,0)}else{if(a=this._events[e],"function"==typeof a){switch(this.event=e,h){case 1:a.call(this);break;case 2:a.call(this,arguments[1]);break;case 3:a.call(this,arguments[1],arguments[2]);break;default:for(s=new Array(h-1),l=1;h>l;l++)s[l-1]=arguments[l];a.apply(this,s)}return!0}a&&(a=a.slice())}if(a&&a.length){if(h>3)for(s=new Array(h-1),l=1;h>l;l++)s[l-1]=arguments[l];for(r=0,i=a.length;i>r;r++)switch(this.event=e,h){case 1:a[r].call(this);break;case 2:a[r].call(this,arguments[1]);break;case 3:a[r].call(this,arguments[1],arguments[2]);break;default:a[r].apply(this,s)}return!0}if(!this._all&&"error"===e)throw arguments[1]instanceof Error?arguments[1]:new Error("Uncaught, unspecified 'error' event.");return!!this._all},i.prototype.emitAsync=function(){this._events||t.call(this);var e=arguments[0];if("newListener"===e&&!this.newListener&&!this._events.newListener)return Promise.resolve([!1]);var s,i,r,l,a,h=[],o=arguments.length;if(this._all){if(o>3)for(s=new Array(o),l=1;o>l;l++)s[l]=arguments[l];for(r=0,i=this._all.length;i>r;r++)switch(this.event=e,o){case 1:h.push(this._all[r].call(this,e));break;case 2:h.push(this._all[r].call(this,e,arguments[1]));break;case 3:h.push(this._all[r].call(this,e,arguments[1],arguments[2]));break;default:h.push(this._all[r].apply(this,s))}}if(this.wildcard){a=[];var c="string"==typeof e?e.split(this.delimiter):e.slice();n.call(this,a,c,this.listenerTree,0)}else a=this._events[e];if("function"==typeof a)switch(this.event=e,o){case 1:h.push(a.call(this));break;case 2:h.push(a.call(this,arguments[1]));break;case 3:h.push(a.call(this,arguments[1],arguments[2]));break;default:for(s=new Array(o-1),l=1;o>l;l++)s[l-1]=arguments[l];h.push(a.apply(this,s))}else if(a&&a.length){if(o>3)for(s=new Array(o-1),l=1;o>l;l++)s[l-1]=arguments[l];for(r=0,i=a.length;i>r;r++)switch(this.event=e,o){case 1:h.push(a[r].call(this));break;case 2:h.push(a[r].call(this,arguments[1]));break;case 3:h.push(a[r].call(this,arguments[1],arguments[2]));break;default:h.push(a[r].apply(this,s))}}else if(!this._all&&"error"===e)return arguments[1]instanceof Error?Promise.reject(arguments[1]):Promise.reject("Uncaught, unspecified 'error' event.");return Promise.all(h)},i.prototype.on=function(e,s){if("function"==typeof e)return this.onAny(e),this;if("function"!=typeof s)throw new Error("on only accepts instances of Function");if(this._events||t.call(this),this.emit("newListener",e,s),this.wildcard)return r.call(this,e,s),this;if(this._events[e]){if("function"==typeof this._events[e])this._events[e]=[this._events[e],s];else if(l(this._events[e])&&(this._events[e].push(s),!this._events[e].warned)){var i=a;"undefined"!=typeof this._events.maxListeners&&(i=this._events.maxListeners),i>0&&this._events[e].length>i&&(this._events[e].warned=!0,console.error("(node) warning: possible EventEmitter memory leak detected. %d listeners added. Use emitter.setMaxListeners() to increase limit.",this._events[e].length),console.trace&&console.trace())}}else this._events[e]=s;return this},i.prototype.onAny=function(e){if("function"!=typeof e)throw new Error("onAny only accepts instances of Function");return this._all||(this._all=[]),this._all.push(e),this},i.prototype.addListener=i.prototype.on,i.prototype.off=function(t,s){function i(t){if(t!==e){var s=Object.keys(t);for(var n in s){var r=s[n],l=t[r];l instanceof Function||"object"!=typeof l||(Object.keys(l).length>0&&i(t[r]),0===Object.keys(l).length&&delete t[r])}}}if("function"!=typeof s)throw new Error("removeListener only takes instances of Function");var r,a=[];if(this.wildcard){var h="string"==typeof t?t.split(this.delimiter):t.slice();a=n.call(this,null,h,this.listenerTree,0)}else{if(!this._events[t])return this;r=this._events[t],a.push({_listeners:r})}for(var o=0;o<a.length;o++){var c=a[o];if(r=c._listeners,l(r)){for(var f=-1,u=0,p=r.length;p>u;u++)if(r[u]===s||r[u].listener&&r[u].listener===s||r[u]._origin&&r[u]._origin===s){f=u;break}if(0>f)continue;return this.wildcard?c._listeners.splice(f,1):this._events[t].splice(f,1),0===r.length&&(this.wildcard?delete c._listeners:delete this._events[t]),this.emit("removeListener",t,s),this}(r===s||r.listener&&r.listener===s||r._origin&&r._origin===s)&&(this.wildcard?delete c._listeners:delete this._events[t],this.emit("removeListener",t,s))}return i(this.listenerTree),this},i.prototype.offAny=function(e){var t,s=0,i=0;if(e&&this._all&&this._all.length>0){for(t=this._all,s=0,i=t.length;i>s;s++)if(e===t[s])return t.splice(s,1),this.emit("removeListenerAny",e),this}else{for(t=this._all,s=0,i=t.length;i>s;s++)this.emit("removeListenerAny",t[s]);this._all=[]}return this},i.prototype.removeListener=i.prototype.off,i.prototype.removeAllListeners=function(e){if(0===arguments.length)return!this._events||t.call(this),this;if(this.wildcard)for(var s="string"==typeof e?e.split(this.delimiter):e.slice(),i=n.call(this,null,s,this.listenerTree,0),r=0;r<i.length;r++){var l=i[r];l._listeners=null}else{if(!this._events||!this._events[e])return this;this._events[e]=null}return this},i.prototype.listeners=function(e){if(this.wildcard){var s=[],i="string"==typeof e?e.split(this.delimiter):e.slice();return n.call(this,s,i,this.listenerTree,0),s}return this._events||t.call(this),this._events[e]||(this._events[e]=[]),l(this._events[e])||(this._events[e]=[this._events[e]]),this._events[e]},i.prototype.listenersAny=function(){return this._all?this._all:[]},"function"==typeof define&&define.amd?define(function(){return i}):"object"==typeof exports?module.exports=i:window.EventEmitter2=i}();
 //TagManager Herencia
-TagManager.prototype = new EventEmitter2();
+TagManager.prototype = new EventEmitter2({
+      wildcard: true,
+      delimiter: '.', 
+      maxListeners: 200
+});
 TagManager.prototype.constructor = TagManager;
