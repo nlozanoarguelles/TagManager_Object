@@ -708,13 +708,13 @@ window.TagManager = function(settings) {
     var tealiumParser = function(tealiumObject){
         var reservedEvents = ["log","errors","dataFilled","dataFilledError","allDataFilled","allDataFilledError","load","ready", "preload",".priority-"];
         function arrayContainsString (array, stringValue){
-        for (var i = array.length - 1; i >= 0; i--) {
-            if(array[i].indexOf(stringValue) > -1 || stringValue.indexOf(array[i]) > -1){
-                return true;
+            for (var i = array.length - 1; i >= 0; i--) {
+                if(array[i].indexOf(stringValue) > -1 || stringValue.indexOf(array[i]) > -1){
+                    return true;
+                }
             }
+            return false;
         }
-        return false;
-    }
         //Parsing events
         _self.onAny(function(event){
             var eventName = event;
@@ -743,7 +743,7 @@ window.TagManager = function(settings) {
                     eventObject[params[paramIndex]] = eventValue;
 
                 }
-                //tealiumObject.link(eventObject);
+                tealiumObject.link(eventObject);
             }else if(eventName.indexOf("dataFilled.") > -1){
                 var dataName = eventName.replace("dataFilled.","");
                 tealiumObject.data[dataName] = _self.utils.getDataValueFromName(dataName);
