@@ -692,13 +692,7 @@ window.TagManager = function(settings) {
     var gtmEventParser = function(dataLayerReference){
         _self.onAny(function(event){
             if(dataLayerReference){
-                var eventName = event;
-                if(Array.isArray(event)){
-                    eventName = "";
-                    event.forEach( function(element, index) {
-                        eventName += ('.'+ element);
-                    });
-                }
+                var eventName = Array.isArray(event)? event.join('.') : event;
                 dataLayerReference.push({'event': eventName});
             }
             
@@ -717,13 +711,7 @@ window.TagManager = function(settings) {
         }
         //Parsing events
         _self.onAny(function(event){
-            var eventName = event;
-            if(Array.isArray(event)){
-                eventName = "";
-                event.forEach( function(element, index) {
-                    eventName += ('.'+ element);
-                });
-            }
+            var eventName = Array.isArray(event)? event.join('.') : event;
             if(eventName && tealiumObject.link && !arrayContainsString(reservedEvents,eventName)){
                 var eventObject = {'event_name': eventName};
                 var params = [];
