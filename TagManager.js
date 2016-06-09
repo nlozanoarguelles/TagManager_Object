@@ -467,7 +467,7 @@ window.TagManager = function(settings) {
                     for(var i = 0; i < dataInfo.trigger.length; i++){
 
                         if (dataInfo.priority && dataInfo.priority === "max") {
-                            dataInfo.priority = 1e100;
+                            dataInfo.priority = 1e20;
                         } 
                         var priorityNumber = parseInt(dataInfo.priority);
                         if (isNaN(priorityNumber) || priorityNumber < 0) {
@@ -652,6 +652,21 @@ window.TagManager = function(settings) {
 	    //Se copia la función al objeto TagManager para que se puede utilizar en la definición de datos y en los escuchadores correspondientes
 	    _self.utils[utilInfo.name] = utilInfo.util.bind(_self);
 	}
+
+    /**
+     * Funcion que permite la suscribción de varios eventos bajo un mismo callback
+     * @param  {[Array]}   eventArray array conteniendo los disparadores del callback
+     * @param  {Function} callback   funcion callback a ejecutar
+     */
+    _self.onMany = function(eventArray,callback){
+        if(eventArray && Array.isArray(eventArray)){
+            for (var i = eventArray.length - 1; i >= 0; i--) {
+                _self.on(eventArray[i],callback);
+            }
+        }else{
+            _self.error("Error[onMany] the util eventArray has to be an array containing the eventName triggers");
+        }
+    }
 
     /**
      * Funcion utilizada para lanzar los mensajes de log asociados al objeto TagManager. Con cada llamada a log se hace una emisión de un evento "log" pasando como parametro el mensaje de log
