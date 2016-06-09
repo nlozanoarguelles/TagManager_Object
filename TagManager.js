@@ -467,45 +467,45 @@ window.TagManager = function(settings) {
                     for(var i = 0; i < dataInfo.trigger.length; i++){
 
                         if (dataInfo.priority && dataInfo.priority === "max") {
-                            var triggerListeners = _self.listeners(dataInfo.trigger[i]);
-                            triggerListeners.unshift(dataListenerSetter);
-                        } else {
-                            var priorityNumber = parseInt(dataInfo.priority);
-                            if (isNaN(priorityNumber) || priorityNumber < 0) {
-                                priorityNumber = 0;
-                            }
-                            var priorityName = "priority-" + priorityNumber;
-                            if (!_self.events[dataInfo.trigger[i]]) {
-                                _self.events[dataInfo.trigger[i]] = {};
-                                _self.on(dataInfo.trigger[i], (function(i){
-                                    return function() {
-                                        var argumentsEmitter = arguments || [];
-                                        var priorityArray = Object.keys(_self.events[dataInfo.trigger[i]]);
-                                        priorityArray.sort(function(a, b) {
-                                            var getIndexNumber = function(priorityText) {
-                                                return parseInt(priorityText.replace('priority-', ''));
-                                            };
-                                            a = getIndexNumber(a);
-                                            b = getIndexNumber(b);
-                                            return b - a;
-                                        });
-                                        priorityArray.forEach(function(element) {
-                                            var eventName = dataInfo.trigger[i] + '.' + element;
-                                            var argumentsEmitterPriority = [eventName];
-                                            for (var j = 0; j < argumentsEmitter.length; j++) {
-                                                argumentsEmitterPriority.push(argumentsEmitter[j]);
-                                            }                                           
-                                            _self.emit.apply(_self, argumentsEmitterPriority);
-                                        });
-                                    }
-                                })(i));
-                            }
-                            var eventName = dataInfo.trigger[i] + '.' + priorityName;
-                            _self.events[dataInfo.trigger[i]][priorityName] = _self.events[dataInfo.trigger[i]][priorityName] || [];
-                            _self.events[dataInfo.trigger[i]][priorityName].push(dataInfo.name);
-
-                            _self.on(eventName, dataListenerSetter);
+                            dataInfo.priority = 1e100;
+                        } 
+                        var priorityNumber = parseInt(dataInfo.priority);
+                        if (isNaN(priorityNumber) || priorityNumber < 0) {
+                            priorityNumber = 0;
                         }
+                        var priorityName = "priority-" + priorityNumber;
+                        if (!_self.events[dataInfo.trigger[i]]) {
+                            _self.events[dataInfo.trigger[i]] = {};
+                            _self.on(dataInfo.trigger[i], (function(i){
+                                return function() {
+                                    var argumentsEmitter = arguments || [];
+                                    var priorityArray = Object.keys(_self.events[dataInfo.trigger[i]]);
+                                    priorityArray.sort(function(a, b) {
+                                        var getIndexNumber = function(priorityText) {
+                                            return parseInt(priorityText.replace('priority-', ''));
+                                        };
+                                        a = getIndexNumber(a);
+                                        b = getIndexNumber(b);
+                                        return b - a;
+                                    });
+                                    priorityArray.forEach(function(element) {
+                                        var eventName = dataInfo.trigger[i] + '.' + element;
+                                        var argumentsEmitterPriority = [eventName];
+                                        for (var j = 0; j < argumentsEmitter.length; j++) {
+                                            argumentsEmitterPriority.push(argumentsEmitter[j]);
+                                        }                                           
+                                        _self.emit.apply(_self, argumentsEmitterPriority);
+                                    });
+                                }
+                            })(i));
+                           } 
+                        var eventName = dataInfo.trigger[i] + '.' + priorityName;
+                        _self.events[dataInfo.trigger[i]][priorityName] = _self.events[dataInfo.trigger[i]][priorityName] || [];
+                        _self.events[dataInfo.trigger[i]][priorityName].push(dataInfo.name);
+
+                        _self.on(eventName, dataListenerSetter);
+                        
+
                     }
 
 				}else{
@@ -570,7 +570,7 @@ window.TagManager = function(settings) {
 			            	}
 			                
 			            },
-			            trigger: eventInfo.name,
+			            trigger: eventName,
 			            priority: "max"
 			    	}
 			    };
