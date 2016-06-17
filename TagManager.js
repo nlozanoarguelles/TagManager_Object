@@ -759,7 +759,7 @@ window.TagManager = function(settings) {
 
                 }
                 tealiumObject.link(eventObject);
-            }else if(eventName.indexOf("dataFilled.") > -1){
+            }else if(eventName && eventName.indexOf("dataFilled.") > -1){
                 var dataName = eventName.replace("dataFilled.","");
                 tealiumObject.data[dataName] = _self.utils.getDataValueFromName(dataName);
             }
