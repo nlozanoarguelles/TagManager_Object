@@ -721,15 +721,6 @@ window.TagManager = function(settings) {
     }
 
     var tealiumParser = function(tealiumObject){
-        var reservedEvents = ["log","errors","dataFilled","dataFilledError","allDataFilled","allDataFilledError","load","ready", "preload",".priority-"];
-        function arrayContainsString (array, stringValue){
-            for (var i = array.length - 1; i >= 0; i--) {
-                if(array[i].indexOf(stringValue) > -1 || stringValue.indexOf(array[i]) > -1){
-                    return true;
-                }
-            }
-            return false;
-        }
         //Parsing events
         _self.onAny(function(event){
             var eventName = event;
@@ -739,27 +730,7 @@ window.TagManager = function(settings) {
                     eventName += ('.'+ element);
                 });
             }
-            if(eventName && tealiumObject.link && !arrayContainsString(reservedEvents,eventName)){
-                var eventObject = {'event_name': eventName};
-                var params = [];
-                if(_self.data.events && _self.data.events[eventName]){
-                    var objectKeys = Object.keys(_self.data.events[eventName]);
-                    if(objectKeys.length == arguments.length-1){
-                        eventParams = objectKeys;
-                    }
-                }else{
-                    for(var i = 1; i < arguments.length; i++){
-                        params.push("param-"+i);
-                    }
-                }
-                for(var i = 1; i < arguments.length; i++){
-                    var paramIndex = i - 1;
-                    var eventValue = _self.utils.isObject() ? _self.utils.objectToArray(arguments[i]) : arguments[i];
-                    eventObject[params[paramIndex]] = eventValue;
-
-                }
-                tealiumObject.link(eventObject);
-            }else if(eventName && eventName.indexOf("dataFilled.") > -1){
+            if(eventName.indexOf("dataFilled.") > -1){
                 var dataName = eventName.replace("dataFilled.","");
                 tealiumObject.data[dataName] = _self.utils.getDataValueFromName(dataName);
             }
@@ -769,6 +740,7 @@ window.TagManager = function(settings) {
 
 
     }
+
 
     /**
     * Da valor a los diferentes elementos que componen el objeto TagManager en función de los datos de inicialización 
