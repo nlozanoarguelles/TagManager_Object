@@ -707,13 +707,7 @@ window.TagManager = function(settings) {
     var gtmEventParser = function(dataLayerReference){
         _self.onAny(function(event){
             if(dataLayerReference){
-                var eventName = event;
-                if(Array.isArray(event)){
-                    eventName = "";
-                    event.forEach( function(element, index) {
-                        eventName += ('.'+ element);
-                    });
-                }
+                var eventName = Array.isArray(event)? event.join('.') : event;
                 dataLayerReference.push({'event': eventName});
             }
             
@@ -723,18 +717,13 @@ window.TagManager = function(settings) {
     var tealiumParser = function(tealiumObject){
         //Parsing events
         _self.onAny(function(event){
-            var eventName = event;
-            if(Array.isArray(event)){
-                eventName = "";
-                event.forEach( function(element, index) {
-                    eventName += ('.'+ element);
-                });
-            }
-            if(eventName.indexOf("dataFilled.") > -1){
-                var dataName = eventName.replace("dataFilled.","");
-                tealiumObject.data[dataName] = _self.utils.getDataValueFromName(dataName);
-            }
-
+	    	var eventName = Array.isArray(event)? event.join('.') : event;
+			if(typeof eventName != 'undefined'){
+			    if(eventName.indexOf("dataFilled.") > -1){
+			    	var dataName = eventName.replace("dataFilled.","");
+			    	tealiumObject.data[dataName] = _self.utils.getDataValueFromName(dataName);
+			    }
+			  }
         });
 
 
