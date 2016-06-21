@@ -404,6 +404,37 @@ window.TagManager = function(settings) {
         return arrayResult;
     }
 
+    _self.utils.flatten = function(data) {
+        var result = {};
+        function recurse (cur, prop) {
+            if (Object(cur) !== cur) {
+                if(Array.isArray(result[prop])){
+                    result[prop].push(cur);
+                } else if(result[prop]){                
+                    var aux = result[prop];
+                    result[prop] = [];
+                    result[prop].push(aux);
+                    result[prop].push(cur);
+                } else result[prop] = cur;
+            } else if (Array.isArray(cur)) {
+                for(var i=0, l=cur.length; i<l; i++)
+                    recurse(cur[i], prop);
+                if (l == 0)
+                    result[prop] = [];
+            } else {
+                var isEmpty = true;
+                for (var p in cur) {
+                    isEmpty = false;
+                    recurse(cur[p], prop ? prop+"."+p : p);
+                }
+                if (isEmpty && prop)
+                    result[prop] = {};
+            }
+        }
+        recurse(data, "");
+        return result;
+    }
+
     /**
      * Permite añadir al objeto TagManager el data indicado en el objeto que lo describe
      * @param {[Object]} Se debe pasar un objeto con las siguientes claves:
