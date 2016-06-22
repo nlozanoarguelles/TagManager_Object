@@ -745,22 +745,27 @@ window.TagManager = function(settings) {
         });
     }
 
-    var tealiumParser = function(tealiumObject){
-        //Parsing events
-        _self.onAny(function(event){
-	    	var eventName = Array.isArray(event)? event.join('.') : event;
+  /**
+   * Cuando se rellena un data, lo aplana y lo introduce en el objeto de tealium
+   */
+	var tealiumParser = function(tealiumObject){
+		//Parsing events
+		_self.onAny(function(event){
+			var eventName = Array.isArray(event)? event.join('.') : event;
 			if(typeof eventName != 'undefined'){
-			    if(eventName.indexOf("dataFilled.") > -1){
-			    	var dataName = eventName.replace("dataFilled.","");
-			    	tealiumObject.data[dataName] = _self.utils.getDataValueFromName(dataName);
-			    }
-			  }
-        });
-
-
-
-    }
-
+				if(eventName.indexOf("dataFilled.") > -1){
+					var dataName = eventName.replace("dataFilled.","");
+					var data = _self.utils.getDataValueFromName(dataName);
+					var dataFlattened = _self.utils.flatten(data);
+					for(d in flattenData){
+						var fullName = dataName + (d? "."+d: "");
+						_self.log('[tealiumParser]: added to tealium datas: '+fullName+"="+dataFlattened[d]);
+						tealiumObject.data[fullName] = dataFlattened[d];
+					}
+				}
+			}
+		});
+	}
 
     /**
     * Da valor a los diferentes elementos que componen el objeto TagManager en función de los datos de inicialización 
