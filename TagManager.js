@@ -757,7 +757,7 @@ window.TagManager = function(settings) {
 					var dataName = eventName.replace("dataFilled.","");
 					var data = _self.utils.getDataValueFromName(dataName);
 					var dataFlattened = _self.utils.flatten(data);
-					for(d in flattenData){
+					for(d in dataFlattened){
 						var fullName = dataName + (d? "."+d: "");
 						_self.log('[tealiumParser]: added to tealium datas: '+fullName+"="+dataFlattened[d]);
 						tealiumObject.data[fullName] = dataFlattened[d];
