@@ -2,42 +2,42 @@
 var tagManagerSettings = {
 
     events: [{
+        name: "scroll",
+        details: "Evento que se dispara cuando se hace scroll hasta ciertos milestones (por defecto 25, 50, 27 y 100% de la página)",
+        listener: function() {
+            var _self = this;
+            window.progress = -1;
+            jQuery(window).scroll(function() {
+                var wintop = jQuery(window).scrollTop();
+                var docheight = jQuery(document).height();
+                var winheight = jQuery(window).height();
+                var percent = (wintop / (docheight - winheight)) * 100;
+
+                var ceilPercent = Math.ceil(percent);
+                if (ceilPercent > progress) {
+                    progress = ceilPercent;
+                    _self.emit('scroll', 'scroll', ceilPercent, _self.data.pageInfo.pageName);
+                }
+            });
+        },
+        trigger: "ready"
+    }, {
         name: "blogPost",
         details: "Evento que se produce cuando una página vinculada a un post",
         listener: function() {
             var _self = this;
-            if (_self.data.pageInfo.pageType === _self.data.constants.pageType.TYPE_BLOG && jQuery('.blog_single').length > 0) {
+            if (_self.data.pageInfo.pageType === _self.data.constants.pageType.BLOG && jQuery('.blog_single').length > 0) {
                 _self.emit("blogPost");
             }
 
         },
         trigger: "ready"
     }, {
-        name: "gaIdAvailable",
-        details: "Evento que se produce cuando el objeto ga devuelve un tracker que permite extraer el id",
-        listener: function() {
-            var _self = this;
-            var gaIdCookie = _self.utils.getCookie('_gaid');
-            if (gaIdCookie) {
-                _self.emit("gaIdAvailable", gaIdCookie);
-            } else {
-                if (typeof ga != "undefined") {
-
-                    ga(function(tracker) {
-                        utag_data.gaIdCookie = tracker.get('clientId');
-                        setCookie('_gaid', tracker.get('clientId'), 30);
-                        _self.emit("gaIdAvailable", gaIdCookie);
-                    });
-                }
-            }
-        },
-        trigger: "load"
-    },{
         name: "fingerprintAvailable",
         details: "Evento que se produce cuando el objeto Fingerprint2 es capaz de generar un fingerprint del usuario",
         listener: function() {
             var _self = this;
-            new Fingerprint2().get(function(result, components){
+            new Fingerprint2().get(function(result, components) {
                 _self.emit("fingerprintAvailable", result, components);
             });
         },
@@ -62,33 +62,543 @@ var tagManagerSettings = {
 
         },
         trigger: "ready"
-    },
-    {
-        name: "asDataLoaded",
-        details: "Evento que se ejecuta cuando se recibe la respuesta del servidor de Audience Stream (AS) con los datos del usuario. Permite saber cuando se han integrado los datos en el objeto utag.data",
-        listener: function(){
-            var _self = this;
-            var asInterval = setInterval(function(){
-                if(document.querySelector('[src*="//visitor-service-"]')){
-                    clearInterval(asInterval);
-                    _self.emit("asDataLoaded");
-                }
-            },100);
-        },
-        trigger: "ready"
-    },
-    {
+    }, {
         name: "whoisReady",
         details: "Evento que indica que se ha recibido la información relativa a la red del usuario",
-        listener: function(){
+        listener: function() {
             var _self = this;
             jQuery.getJSON("http://130.211.101.65:8001/api/whois", function(whoisData) {
                 _self.emit("whoisReady", whoisData);
             });
         },
         trigger: "ready"
-    }
-    ],
+    }, {
+        name: "adBlockChecker",
+        details: "Evento que indica que se ha recibido la información relativa a la red del usuario",
+        listener: function() {
+            var _self = this;
+            var test = document.createElement('div');
+            test.innerHTML = '&nbsp;';
+            test.className = 'adsbox';
+            document.body.appendChild(test);
+            window.setTimeout(function() {
+                if (typeof ga == "function") {
+                    if (test.offsetHeight === 0) {
+                        //activado
+                        _self.emit("adBlockChecker", true);
+                    } else {
+                        //desactivado
+                        _self.emit("adBlockChecker", false);
+                    };
+                    test.remove();
+                }
+            }, 1000);
+        },
+        trigger: "ready"
+    }, {
+        name: "ssCompleteSubmit",
+        details: "Evento que se lanza cuando un usuario hace un submit del formulario de suscripción de la StaySharp completo (el que tiene twitter, cargo y empresa). Pasa como parámetros twitter, company y job",
+        listener: function() {
+            var _self = this;
+            jQuery('.wpcf7-submit').on('mousedown', function() {
+                var twitter = jQuery('#mce-MMERGE4').val();
+                var company = jQuery('#mce-MMERGE3').val()
+                var job = jQuery('#mce-MMERGE5').val();
+                _self.emit("ssCompleteSubmit", twitter, company, job);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.headerLinks",
+        details: "Evento que se genera cuando se pulsa sobre alguno de los enlaces superiores [twitter, youtube, mail, etc.]. OJO: no hacen referencia al menú de secciones de la web",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+
+            jQuery('.header_top a').on('mousedown', function() {
+                var href = jQuery(this).attr('href');
+                var buttonText = jQuery(this).text() || jQuery(this).attr('title');
+                _self.emit("user.headerLinks", "header", _self.utils.cleanText(buttonText), href);
+            });
+
+        },
+        trigger: "ready"
+    }, {
+        name: "newsletterSubscription",
+        details: "Evento que se genera cuando se detecta que un usuario ha realizado un submit correcto del formulario de suscribción a la newsletter",
+        listener: function() {
+            var _self = this;
+
+            //General form
+            if (jQuery('.mc4wp-alert.mc4wp-success').length > 0) {
+                _self.emit('.newsletterSubscription');
+            }
+
+            //Stay-sharp form
+            if (jQuery('#mce-success-response').length > 0) {
+                var subscriptionInterval = setInterval(function() {
+                    if (jQuery('#mce-success-response:visible').length > 0) {
+                        _self.emit('user.newsletterSubscription');
+                        clearInterval(subscriptionInterval);
+                    }
+                }, 300);
+            }
+
+
+        },
+        trigger: "ready"
+    }, {
+        name: "contactFormSubmitted",
+        details: "Evento que se genera cuando se detecta que un usuario ha realizado un submit del formulario de contacto de una de las landings",
+        listener: function() {
+            var _self = this;
+
+            if (jQuery('.wpcf7-form').length > 0) {
+                var subscriptionInterval = setInterval(function() {
+                    if (jQuery('.wpcf7-mail-sent-ok:visible').length > 0) {
+                        _self.emit('contactFormSubmitted');
+                        clearInterval(subscriptionInterval);
+                    }
+                }, 300);
+            }
+        },
+        trigger: "ready"
+    }, {
+        name: "user.contactFormLink",
+        details: "Evento que se genera cuando se hace clic sobre el botón \"contactanos\" del bloque inferior presente en casi todas las páginas del portal",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.home-newsletter-contacto .wpb_wrapper a').on('mousedown', function() {
+                var href = jQuery(this).attr('href');
+                var buttonText = jQuery(this).text() || jQuery(this).attr('title');
+                _self.emit("user.contactFormLink", "footer", _self.utils.cleanText(buttonText), href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.socialFooterLinks",
+        details: "Evento que se genera cuando se hace clic sobre alguno de los enlaces sociales que aparecen en la parte inferior de la página",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('#menu-footer-social li').on('mousedown', function() {
+                var href = jQuery(this).attr('href');
+                var buttonText = jQuery(this).text() || jQuery(this).attr('title');
+                _self.emit("user.socialFooterLinks", "footer", _self.utils.cleanText(buttonText), href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.homeClientsSlider",
+        details: "Evento que se genera cuando se hace clic sobre alguno de los clientes que aparecen en el slider",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.clients-carousel li, .clientes-carousel li').on('mousedown', function() {
+                var href = jQuery(this).attr('href');
+                var buttonText = jQuery(this).find('img').attr('alt');
+                _self.emit("user.homeClientsSlider", "home", _self.utils.cleanText(buttonText), href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.homeDigitalIntelligence",
+        details: "Evento que se genera cuando se hace clic sobre el botón Inteligencia Digital de la Home",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('a.qbutton[href*="inteligencia-digital/"], a.qbutton[href*="digital-intelligence/"]').on('mousedown', function() {
+                var href = jQuery(this).attr('href');
+                var buttonText = jQuery(this).text();
+                _self.emit("user.homeDigitalIntelligence", "home", _self.utils.cleanText(buttonText), href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.homeDigitalTransformation",
+        details: "Evento que se genera cuando se hace clic sobre el botón Transformacion Digital de la Home",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('a.qbutton[href*="transformacion-digital/"], a.qbutton[href*="digital-transformation/"]').on('mousedown', function() {
+                var href = jQuery(this).attr('href');
+                var buttonText = jQuery(this).text();
+                _self.emit("user.homeDigitalTransformation", "home", _self.utils.cleanText(buttonText), href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.homeBlog",
+        details: "Evento que se genera cuando se hace clic sobre el botón Actualizate Ahora de la Home",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('a.qbutton[href*="actualidad/"]').on('mousedown', function() {
+                var href = jQuery(this).attr('href');
+                var buttonText = jQuery(this).text();
+                _self.emit("user.homeDigitalTransformation", "home", _self.utils.cleanText(buttonText), href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.homePost",
+        details: "Evento que se genera cuando se hace clic sobre uno de los posts que se promocionan en la home",
+        params: ["placement", "elementClicked", "href"],
+        listener: function() {
+            var _self = this;
+            var postDataListener = function(elementType, postIndex, href) {
+                return function() {
+                    _self.emit("user.homePost", "home", 'clic:post-' + postIndex + ':link-' + elementType, href);
+                }
+            }
+            var basicSelector = '.latest_post_holder ul li';
+            var elementType = [{
+                name: 'title',
+                selector: 'h4 a'
+            }, {
+                name: 'read more',
+                selector: '.excerpt a'
+            }];
+            for (var i = 0; i < elementType.length; i++) {
+                var selector = basicSelector + ' ' + elementType[i].selector;
+                jQuery(selector).each(function(index, element) {
+                    jQuery(this).on('mousedown', postDataListener(elementType[i].name, index, jQuery(this).attr('href')));
+                });
+            }
+        },
+        trigger: "ready"
+    }, {
+        name: "user.homePostCategory",
+        details: "Evento que se genera cuando se hace clic sobre el botón Actualizate Ahora de la Home",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            var postDataListener = function(elementType, postIndex, href) {
+                return function() {
+                    _self.emit("user.homePostCategory", "home", 'clic:post-' + postIndex + ':link-categoria', href);
+                }
+            }
+
+            jQuery('.latest_post_holder ul li .latest_post_categories a').each(function(index, element) {
+                jQuery(this).on('mousedown', postDataListener(index, jQuery(this).attr('href')));
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.digitalAnalyticsAnalytics",
+        details: "Evento que se genera cuando se hace clic sobre alguno de los botones de la sección de Analytics de la categoría Digital Analytics",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+
+            jQuery('a[href="#digitalanalytics"]').on('mousedown', function() {
+                var buttonText = _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.digitalAnalyticsAnalytics", "inteligencia digital", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.digitalAnalyticsManagement",
+        details: "Evento que se genera cuando se hace clic sobre alguno de los botones de la sección de Tag/Data Management de la categoría Digital Analytics",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('a[href="#tagdatamanagement"],a[href*="tag-management"]').on('mousedown', function() {
+                var buttonText = _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.digitalAnalyticsManagement", "inteligencia digital", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.digitalAnalyticsPersonalization",
+        details: "Evento que se genera cuando se hace clic sobre alguno de los botones de la sección de Personalización de la categoría Digital Analytics",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('a[href*="testing-y-personalizacion"]').on('mousedown', function() {
+                var buttonText = _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.digitalAnalyticsPersonalization", "inteligencia digital", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.digitalAnalyticsContact",
+        details: "Evento que se genera cuando se hace clic el botón de contacto de la categoría Digital Analytics",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.vc_custom_1432643724941 .section_inner_margin').on('mousedown', '.qbutton', function(e) {
+                var buttonText = _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.digitalAnalyticsContact", "inteligencia digital", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.digitalAnalyticsBlog",
+        details: "Evento que se genera cuando se hace clic sobre el botón de acceso al Blog AW de la categoría Digital Analytics",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.vc_custom_1431423587955 .section_inner_margin').on('mousedown', '.qbutton', function() {
+                var buttonText = _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.digitalAnalyticsBlog", "inteligencia digital", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.digitalTransformationModel",
+        details: "Evento que se genera cuando se hace clic sobre el botón Ver Modelo de la categoría Transformación Digital",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.vc_custom_1431011527891 .qbutton').on('mousedown', function() {
+                var buttonText = _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.digitalTransformationModel", "transformacion digital", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.digitalTransformationStart",
+        details: "Evento que se genera cuando se hace clic sobre el botón Empezar Ahora de la categoría Transformación Digital",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.vc_custom_1432658359864 .section_inner_margin .qbutton').on('mousedown', function() {
+                var buttonText = _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.digitalTransformationStart", "transformacion digital", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.digitalTransformationBlog",
+        details: "Evento que se genera cuando se hace clic sobre el botón de enlace al blog de la categoría Transformación Digital",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.vc_custom_1431423799873 .section_inner_margin .qbutton').on('mousedown', function() {
+                var buttonText = _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.digitalTransformationStart", "transformacion digital", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.usAbout",
+        details: "Evento que se genera cuando se hace clic sobre los botones de la primera sección (trayectoria y unete al equipo) que están dentro de la sección Nosotros",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.vc_custom_1432112652068 a').on('mousedown', function() {
+                //El corazón de los 10 años es clicable pero no tiene texto
+                var buttonText = _self.utils.cleanText(jQuery(this).text()) || 'vision';
+                var href = jQuery(this).attr('href');
+                _self.emit("user.usAbout", "nosotros", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.usTeam",
+        details: "Evento que se genera cuando se hace clic sobre alguno de los elementos clickables que están encima de las fotos de los trabajadores en la sección Nosotros",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.q_team_social_inner').on('mousedown', function() {
+                var buttonText = _self.utils.cleanText(jQuery(this).closest('.q_team').find('.q_team_position').text()) || "";
+                var href = jQuery(this).find('a').attr('href') || "";
+                _self.emit("user.usTeam", "nosotros", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.usContact",
+        details: "Evento que se genera cuando se hace clic sobre el botón contactar que se encuentra dentro de la categoria Nosotros",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.vc_custom_1432114952223 .qbutton').on('mousedown', function() {
+                var buttonText = _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.usContact", "nosotros", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.usEmail",
+        details: "Evento que se genera cuando se hace clic sobre el enlace para escribir un correo a join[@]divisadero.es dentro de la categoria Nosotros",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.empresa-joinus-mail a').on('mousedown', function() {
+                var buttonText = _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.usEmail", "nosotros", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.usVideo",
+        details: "Evento que se genera cuando se hace clic sobre el video conocenos de la categoria Nosotros",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.vc_custom_1461084211582 a').on('mousedown', function() {
+                var buttonText = "video conocenos";
+                var href = jQuery(this).attr('href');
+                _self.emit("user.usVideo", "nosotros", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.blogCategory",
+        details: "Evento que se genera cuando se hace clic sobre alguna de las categorias del bloque superior de las páginas Blog",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.actualidad-categorias .cat-item a').on('mousedown', function() {
+                var buttonText = "category-" + _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.blogCategory", "blog actualidad", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.blogSideCategory",
+        details: "Evento que se genera cuando se hace clic sobre alguna de las categorias del blog presentes en el bloque del lateral derecho de algunas de las páginas del blog",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.widget_categories .cat-item a').on('mousedown', function() {
+                var buttonText = "side category-" + _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.blogSideCategory", "blog actualidad", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.blogRecent",
+        details: "Evento que se genera cuando se hace clic sobre alguno de los articulos dentro del bloque recientes de las páginas del blog",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.widget_recent_entries li a').on('mousedown', function() {
+                var buttonText = "recent-" + _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.blogRecent", "blog actualidad", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.blogTags",
+        details: "Evento que se genera cuando se hace clic sobre alguno de los tags dentro de la nube de tags",
+        params: ["placement", "buttonText", "href"],
+        listener: function() {
+            var _self = this;
+            jQuery('.tagcloud a').on('mousedown', function() {
+                var buttonText = "tag-" + _self.utils.cleanText(jQuery(this).text());
+                var href = jQuery(this).attr('href');
+                _self.emit("user.blogTags", "blog actualidad", buttonText, href);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "recruitingFormSubmit",
+        details: "Evento que se ejecuta cuando se detecta que un usuario ha realizado un submit del formulario de la Landing de Recruitment",
+        listener: function() {
+            var _self = this;
+            jQuery(document).on('recruitment_submit', function() {
+                if (jQuery('.recruitment-form[data-form="recruitmentName"] input').val().length > 0 && jQuery('.recruitment-form[data-form="recruitmentLastName"] input').val().length > 0 && jQuery('.recruitment-form[data-form="recruitmentEmail"] input').val().length > 0) {
+                    var dataToSend = {};
+                    //Mapeo de variables
+                    jQuery('.recruitment-form[data-form*="recruitmen"] input').each(function() {
+                        dataToSend[jQuery(this).closest('[data-form*="recruitment"]').data('form')] = jQuery(this).val();
+                    });
+                    _self.emit("recruitingFormSubmit", dataToSend);
+                }
+            });
+        },
+        trigger: "loadRules.landings.recruiting"
+    }, {
+        name: "postClick",
+        details: "Evento que se genera cuando se hace clic sobre uno de los posts que se promocionan en la home",
+        listener: function() {
+            var _self = this;
+            var postDataListener = function(postIndex) {
+                    return function() {
+                        _self.emit("postClick", _self.data.pageInfo.postList[postIndex]);
+                    }
+                }
+                //Post en la home
+            var basicSelector = '.latest_post_holder ul li';
+            var elementType = [{
+                selector: 'h4 a'
+            }, {
+                selector: '.excerpt a'
+            }];
+            for (var i = 0; i < elementType.length; i++) {
+                var selector = basicSelector + ' ' + elementType[i].selector;
+                jQuery(selector).each(function(index, element) {
+                    jQuery(this).on('mousedown', postDataListener(index));
+                });
+            }
+
+            //Resto de posts
+            var basicSelector = 'article';
+            var elementType = [{
+                selector: 'h2 a'
+            }, {
+                selector: 'a.more-link'
+            }];
+            for (var i = 0; i < elementType.length; i++) {
+                var selector = basicSelector + ' ' + elementType[i].selector;
+                jQuery(selector).each(function(index, element) {
+                    jQuery(this).on('mousedown', postDataListener(index));
+                });
+            }
+        },
+        trigger: "ready"
+    }, {
+        name: "config.subscribeId",
+        details: "Evento que detecta si se tiene el email en la dirección como parámetro",
+        listener: function(pageType) {
+            var _self = this;
+            var buuid = _self.utils.getParameterByName("buuid");
+            var euuid = _self.utils.getParameterByName("euuid");
+            var email = atob(buuid) || euuid;
+            if (email) {
+                _self.log("email por parametro" + email);
+                localStorage.setItem('userId', email);
+                _self.emit("config.subscribeId", email);
+            }
+        },
+        trigger: "preloader",
+    }, {
+        name: "loadRules.landings.recruiting",
+        details: "Regla de carga que se lanza cuando se detecta que la página cargada es la Landing de recruitment",
+        listener: function() {
+            var _self = this;
+            if (document.location.pathname.indexOf('/recruiting-test') > -1) {
+                _self.emit("loadRules.landings.recruiting");
+            }
+        },
+        trigger: "ready"
+    }, {
+        name: "loadRules.pageType",
+        details: "Regla de carga que se lanza cuando se detecta que tipo de página se está mostrando",
+        listener: function(pageType) {
+            var _self = this;
+            var eventName = 'loadRules.pageType.' + pageType;
+            _self.emit(eventName, pageType);
+        },
+        trigger: ["dataFilled.pageInfo.pageType", "dataFilledError.pageInfo.pageType"]
+    }],
 
     data: [{
         name: "configuration.tealiumEnviroment",
@@ -101,6 +611,22 @@ var tagManagerSettings = {
         trigger: "preloader",
         obligatory: true,
         type: "string"
+    }, {
+        name: "configuration.gaAccount.fingerprint",
+        details: "Contiene el ID de la cuenta de Google Analytics a la que se va a hacer el envío con el userId como fingerprint",
+        extractor: function() {
+            return "UA-22058072-1";
+        },
+        trigger: 'preloader',
+        obligatory: true
+    }, {
+        name: "configuration.gaAccount.email",
+        details: "Contiene el ID de la cuenta de Google Analytics a la que se va a hacer el envío con el userId como email",
+        extractor: function() {
+            return "UA-22058072-9";
+        },
+        trigger: 'preloader',
+        obligatory: true
     }, {
         name: "configuration.pathArray",
         details: "Almacena el path de la URL en un Array. Este Array contiene las cadenas de texto en minisculas y los guiones traducidos a espacios",
@@ -119,7 +645,7 @@ var tagManagerSettings = {
         obligatory: true,
         type: "array"
     }, {
-        name: "constants.pageType.TYPE_HOME",
+        name: "constants.pageType.HOME",
         details: "Constante que almacena el tipo de página Home",
         extractor: function() {
             return "home";
@@ -128,7 +654,7 @@ var tagManagerSettings = {
         obligatory: true,
         type: "string"
     }, {
-        name: "constants.pageType.TYPE_LANDING",
+        name: "constants.pageType.LANDING",
         details: "Constante que almacena el tipo de página Landing",
         extractor: function() {
             return "landing";
@@ -137,7 +663,7 @@ var tagManagerSettings = {
         obligatory: true,
         type: "string"
     }, {
-        name: "constants.pageType.TYPE_MAIN_SECTION",
+        name: "constants.pageType.MAIN_SECTION",
         details: "Constante que almacena el tipo de página Sección Principal. Se considera sección principal todas aquellas que aparecen en la cabecera de la página",
         extractor: function() {
             return "seccion principal";
@@ -146,10 +672,64 @@ var tagManagerSettings = {
         obligatory: true,
         type: "string"
     }, {
-        name: "constants.pageType.TYPE_BLOG",
+        name: "constants.pageType.BLOG",
         details: "Constante que almacena el tipo de página Blog. Todas las páginas que van dentro del blog de actualidad",
         extractor: function() {
             return "blog actualidad";
+        },
+        trigger: "preloader",
+        obligatory: true,
+        type: "string"
+    }, {
+        name: "constants.pageType.BLOG_SEARCH",
+        details: "Constante que almacena el tipo de busquea sobre la página Blog.",
+        extractor: function() {
+            return "busqueda blog actualidad";
+        },
+        trigger: "preloader",
+        obligatory: true,
+        type: "string"
+    }, {
+        name: "userInfo.campaign.source",
+        details: "Almacena la fuente de la campaña",
+        extractor: function() {
+            return _self.utils.getParameterByName("utm_source");
+        },
+        trigger: "preloader",
+        obligatory: true,
+        type: "string"
+    }, {
+        name: "userInfo.campaign.medium",
+        details: "Almacena el medio de la campaña",
+        extractor: function() {
+            return _self.utils.getParameterByName("utm_medium");
+        },
+        trigger: "preloader",
+        obligatory: true,
+        type: "string"
+    }, {
+        name: "userInfo.campaign.term",
+        details: "Almacena las palabras clave de la campaña",
+        extractor: function() {
+            return _self.utils.getParameterByName("utm_term");
+        },
+        trigger: "preloader",
+        obligatory: true,
+        type: "string"
+    }, {
+        name: "userInfo.campaign.content",
+        details: "Almacena el contenido de la campaña para diferenciar los anuncios o enlaces que llevan a la misma URL",
+        extractor: function() {
+            return _self.utils.getParameterByName("utm_content");
+        },
+        trigger: "preloader",
+        obligatory: true,
+        type: "string"
+    }, {
+        name: "userInfo.campaign.name",
+        details: "Almacena el nombre de la campaña",
+        extractor: function() {
+            return _self.utils.getParameterByName("utm_campaign");
         },
         trigger: "preloader",
         obligatory: true,
@@ -174,27 +754,36 @@ var tagManagerSettings = {
                     }
                     return false;
                 }
-                //Comprobamos si está presente el slider de publicaciones
+                //Comprobamos si está presente el parametro "s" como query
+            var isBlogSearch = function() {
+                return jQuery('body.search').length > 0;
+            }
+
+            //Comprobamos si está presente el slider de publicaciones
             var isBlogActualidad = function() {
-                var blogDetectElement = jQuery('.widget_wp_posts_carousel');
+                var blogDetectElement = jQuery('.widget_wp_posts_carousel,.widget_tag_cloud');
                 return blogDetectElement.length > 0;
             }
 
-            if (isHome()) {
+            if (isBlogSearch()) {
 
-                return _self.data.constants.pageType.TYPE_HOME;
+                return _self.data.constants.pageType.BLOG_SEARCH;
+
+            } else if (isHome()) {
+
+                return _self.data.constants.pageType.HOME;
 
             } else if (isMainSection()) {
 
-                return _self.data.constants.pageType.TYPE_MAIN_SECTION;
+                return _self.data.constants.pageType.MAIN_SECTION;
 
             } else if (isBlogActualidad()) {
 
-                return _self.data.constants.pageType.TYPE_BLOG;
+                return _self.data.constants.pageType.BLOG;
 
             } else {
 
-                return _self.data.constants.pageType.TYPE_LANDING;
+                return _self.data.constants.pageType.LANDING;
             }
         },
         trigger: "ready",
@@ -207,28 +796,56 @@ var tagManagerSettings = {
         extractor: function() {
             var _self = this;
             switch (_self.data.pageInfo.pageType) {
-                case _self.data.constants.pageType.TYPE_HOME:
-                    return [_self.data.constants.pageType.TYPE_HOME];
+                case _self.data.constants.pageType.HOME:
+                    return [_self.data.constants.pageType.HOME];
                     break;
-                case _self.data.constants.pageType.TYPE_MAIN_SECTION:
+                case _self.data.constants.pageType.MAIN_SECTION:
                     var pathArray = _self.data.configuration.pathArray.slice();
-                    pathArray.unshift(_self.data.constants.pageType.TYPE_MAIN_SECTION);
+                    pathArray.unshift(_self.data.constants.pageType.MAIN_SECTION);
                     return pathArray;
                     break;
-                case _self.data.constants.pageType.TYPE_LANDING:
+                case _self.data.constants.pageType.LANDING:
                     var pathArray = _self.data.configuration.pathArray.slice();
-                    pathArray.unshift(_self.data.constants.pageType.TYPE_LANDING);
+                    pathArray.unshift(_self.data.constants.pageType.LANDING);
                     return pathArray;
                     break;
-                case _self.data.constants.pageType.TYPE_BLOG:
+                case _self.data.constants.pageType.BLOG_SEARCH:
+                    var sectionArray = [_self.data.constants.pageType.BLOG_SEARCH];
+                    var searchKeyword = _self.utils.getParameterByName('s');
+                    sectionArray.push(searchKeyword);
+                    var currentPage = jQuery('.column1 .pagination .active').text() || 1;
+                    sectionArray.push('page-' + currentPage);
+                    return sectionArray;
+                    break;
+                case _self.data.constants.pageType.BLOG:
                     //Comprobamos si existe el grid de articulos
                     if (jQuery('.masonry_pagination.blog_holder').length > 0) {
-                        var currentBlogPage = jQuery('.column1 .pagination .active').text();
-                        return [_self.data.constants.pageType.TYPE_BLOG, "catalogo", "pagina-" + currentBlogPage];
+                        var currentBlogPage = jQuery('.column1 .pagination .active').text() || 1;
+                        return [_self.data.constants.pageType.BLOG, "catalogo", "pagina-" + currentBlogPage];
                     } //Comprobamos si estamos en la página de un post
                     else if (jQuery('.blog_single').length > 0) {
                         var postTitle = _self.utils.cleanText(jQuery('.post_content h2').text());
-                        return [_self.data.constants.pageType.TYPE_BLOG, "post", postTitle];
+                        return [_self.data.constants.pageType.BLOG, "post", postTitle];
+                    } //Comprobamos si estamos en la página correspondiente a un listado de articulos por tag 
+                    else if (_self.data.configuration.pathArray[0] == "tag") {
+                        var tagName = _self.data.configuration.pathArray[1];
+                        var currentTagPage = jQuery('.column1 .pagination .active').text() || 1;
+                        return [_self.data.constants.pageType.BLOG, "tag", tagName, "pagina-" + currentTagPage];
+                    } //Comprobamos si estamos en la página correspondiente a un listado de articulos por categoria 
+                    else if (_self.data.configuration.pathArray[0] == "category") {
+                        var categoryName = _self.utils.cleanText(jQuery('.actualidad-categorias .current-cat').text());
+                        categoryName = categoryName || _self.data.configuration.pathArray[1];
+                        var currentCategoryPage = jQuery('.column1 .pagination .active').text() || 1;
+                        return [_self.data.constants.pageType.BLOG, 'category', categoryName, "pagina-" + currentCategoryPage];
+                    } //Comprobamos si estamos en la página correspondiente a un listado de articulos por fecha
+                    else if (!isNaN(parseInt(_self.data.configuration.pathArray[0])) && !isNaN(parseInt(_self.data.configuration.pathArray[1]))) {
+                        var postsMonth = _self.data.configuration.pathArray[1];
+                        var postsYear = _self.data.configuration.pathArray[0];
+                        var completeDate = postsMonth + '/' + postsYear;
+                        var currentPage = jQuery('.column1 .pagination .active').text() || 1;
+                        return [_self.data.constants.pageType.BLOG, "date", completeDate, "pagina-" + currentPage];
+                    } else {
+                        return [_self.data.constants.pageType.BLOG, 'no-type', document.location.pathname];
                     }
                     break;
             }
@@ -255,6 +872,44 @@ var tagManagerSettings = {
         obligatory: true,
         type: "string"
     }, {
+        name: "pageInfo.search.keyword",
+        details: "Keyword de busqueda",
+        extractor: function(pageType) {
+            var _self = this;
+            if (pageType == _self.data.constants.pageType.BLOG_SEARCH) {
+                var keyword = _self.utils.getParameterByName('s');
+                _self.log('extraccion de palabra de busqueda: ' + keyword);
+                return keyword;
+            } else return '';
+        },
+        trigger: "loadRules.pageType.*",
+        obligatory: true,
+        type: "string"
+    }, {
+        name: "pageInfo.search.resultNum",
+        details: "Almacena el numero de resultados disponibles para la keyword",
+        extractor: function(pageType) {
+            var _self = this;
+            var numResults = 0;
+            if (pageType == _self.data.constants.pageType.BLOG_SEARCH) {
+                numResults = utag_data.search_results;
+            }
+            return numResults;
+        },
+        trigger: "loadRules.pageType.*",
+        obligatory: true,
+        type: "string"
+    }, {
+        name: "userInfo.adblock",
+        details: "Recoge true si el usuario tiene adblock activado y false si no",
+        extractor: function(adblockState) {
+            var _self = this;
+            return adblockState ? 'adblock presente' : 'adblock no presente';
+        },
+        trigger: "adBlockChecker",
+        obligatory: true,
+        type: "string"
+    }, {
         name: "userInfo.ids.tealiumIqId",
         details: "Es el id usado por Tealium IQ para identificar el usuario o el parámetro \"tuuid\" pasado como parámetro (tiene prioridad el parámetro)",
         extractor: function() {
@@ -270,6 +925,7 @@ var tagManagerSettings = {
             }
         },
         trigger: "preloader",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.ids.tealiumAsId",
@@ -278,31 +934,26 @@ var tagManagerSettings = {
             return utag.data._t_visitor_id;
         },
         trigger: "preloader",
+        obligatory: true,
         type: "string"
     }, {
-        name: "userInfo.ids.mc4wpEmail",
+        name: "userInfo.ids.email",
         details: "ID de usuario vinculado al email de suscripción",
         extractor: function() {
             var _self = this;
-            return _self.utils.getCookie("mc4wp_email");
+            return localStorage.getItem('userId') || btoa(_self.utils.getCookie("mc4wp_email"));
         },
-        trigger: "preloader",
+        trigger: ["ready", "user.emailChanged"],
+        obligatory: true,
         type: "string"
     }, {
-        name: "userInfo.ids.gaId",
-        details: "ID de usuario extraido de la cookie de Google Analytics",
-        extractor: function(gaId) {
-            return gaId;
-        },
-        trigger: "gaIdAvailable",
-        type: "string"
-    },{
         name: "userInfo.ids.fingerprint",
         details: "ID de usuario extraido a partir de la información del navegador/dispositivo",
         extractor: function(fingerprint) {
             return fingerprint;
         },
         trigger: "fingerprintAvailable",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.geo.country",
@@ -311,6 +962,7 @@ var tagManagerSettings = {
             return geoData.country;
         },
         trigger: "geoData",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.geo.countryCode",
@@ -319,6 +971,7 @@ var tagManagerSettings = {
             return geoData.countryCode;
         },
         trigger: "geoData",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.geo.region",
@@ -327,6 +980,7 @@ var tagManagerSettings = {
             return geoData.region;
         },
         trigger: "geoData",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.geo.regionName",
@@ -335,6 +989,7 @@ var tagManagerSettings = {
             return geoData.regionName;
         },
         trigger: "geoData",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.geo.city",
@@ -343,6 +998,7 @@ var tagManagerSettings = {
             return geoData.city;
         },
         trigger: "geoData",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.geo.zip",
@@ -351,6 +1007,7 @@ var tagManagerSettings = {
             return geoData.zip;
         },
         trigger: "geoData",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.geo.lat",
@@ -359,6 +1016,7 @@ var tagManagerSettings = {
             return geoData.lat;
         },
         trigger: "geoData",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.geo.long",
@@ -367,6 +1025,7 @@ var tagManagerSettings = {
             return geoData.lon;
         },
         trigger: "geoData",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.geo.timezone",
@@ -375,6 +1034,7 @@ var tagManagerSettings = {
             return geoData.timezone;
         },
         trigger: "geoData",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.geo.isp",
@@ -383,16 +1043,18 @@ var tagManagerSettings = {
             return geoData.isp;
         },
         trigger: "geoData",
+        obligatory: true,
         type: "string"
-    },, {
+    }, , {
         name: "userInfo.network.netname",
         details: "Resultado de nombre de red extraido a partir del servicio whois",
         extractor: function(whoisData) {
             return whoisData.netname;
         },
         trigger: "whoisReady",
+        obligatory: true,
         type: "string"
-    },, {
+    }, , {
         name: "userInfo.network.description",
         details: "Descripción de la red usada por el usuario extraida a partir del servicio whois",
         extractor: function(whoisData) {
@@ -400,6 +1062,7 @@ var tagManagerSettings = {
             return networkDescription;
         },
         trigger: "whoisReady",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.device.model",
@@ -408,6 +1071,7 @@ var tagManagerSettings = {
             return uaParsed.device.model;
         },
         trigger: "uaParser",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.device.type",
@@ -416,6 +1080,7 @@ var tagManagerSettings = {
             return uaParsed.device.type;
         },
         trigger: "uaParser",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.device.vendor",
@@ -424,6 +1089,7 @@ var tagManagerSettings = {
             return uaParsed.device.vendor;
         },
         trigger: "uaParser",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.os.name",
@@ -432,6 +1098,7 @@ var tagManagerSettings = {
             return uaParsed.os.name;
         },
         trigger: "uaParser",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.os.version",
@@ -440,6 +1107,7 @@ var tagManagerSettings = {
             return uaParsed.os.version;
         },
         trigger: "uaParser",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.engine.name",
@@ -448,6 +1116,7 @@ var tagManagerSettings = {
             return uaParsed.engine.name;
         },
         trigger: "uaParser",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.engine.version",
@@ -456,6 +1125,7 @@ var tagManagerSettings = {
             return uaParsed.engine.version;
         },
         trigger: "uaParser",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.browser.name",
@@ -464,6 +1134,7 @@ var tagManagerSettings = {
             return uaParsed.browser.name;
         },
         trigger: "uaParser",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.browser.version",
@@ -472,6 +1143,7 @@ var tagManagerSettings = {
             return uaParsed.browser.version;
         },
         trigger: "uaParser",
+        obligatory: true,
         type: "string"
     }, {
         name: "userInfo.cpu.architecture",
@@ -480,107 +1152,125 @@ var tagManagerSettings = {
             return uaParsed.cpu.architecture;
         },
         trigger: "uaParser",
+        obligatory: true,
         type: "string"
-    }, 
-    {
-        "name": "userInfo.dmpBadges",
-        "details": "Dato generado por AS y que contiene los badges asignados al usuario",
-        "extractor": function() {
-            var utagDataBagdeIds = [{"id":"va.badges.5248","name":"Testing Viewer"},{"id":"va.badges.32","name":"Unbadged"},{"id":"va.badges.5130","name":"Intense viewer"},{"id":"va.badges.5194","name":"Possible Worker"},{"id":"va.badges.5118","name":"Subscribed"},{"id":"va.badges.5299","name":"CEM Viewer"},{"id":"va.badges.5264","name":"TMs Viewer"},{"id":"va.badges.5297","name":"ADTECH Viewer"},{"id":"va.badges.5303","name":"Social Analytics Viewer"},{"id":"va.badges.5301","name":"Enterprise Reporting Viewer"},{"id":"va.badges.5307","name":"Web Analytics Viewer"},{"id":"va.badges.5305","name":"VOC Viewer"},{"id":"va.badges.5201","name":"Blog Actualidad Viewer"},{"id":"va.badges.31","name":"Frequent visitor"},{"id":"va.badges.30","name":"Fan"}];
-            var badgesAssigned = [];
-            for(var i = 0; i < utagDataBagdeIds.length; i++){
-                var badgeAssigned = utag.data[utagDataBagdeIds[i].id];
-                if(badgeAssigned){
-                    badgesAssigned.push(utagDataBagdeIds[i].name);
-                }
-            }
-            return badgesAssigned;
-        },
-        "trigger": "asDataLoaded",
-        "type": "array"
-    },
-    {
-        "name": "userInfo.dmpAudiences",
-        "details": "Dato generado por AS y que contiene las audiencias a las cuales pertenece el usuario",
-        "extractor": function() {
-            var utagDataAudiencesIds = [{"id":"va.audiences.divisadero_divisaderoweb_109","name":"ADTECH Viewer"},{"id":"va.audiences.divisadero_divisaderoweb_102","name":"Possible Worker (subscribed)"},{"id":"va.audiences.divisadero_divisaderoweb_114","name":"Web Analytics Viewer"},{"id":"va.audiences.divisadero_divisaderoweb_101","name":"Possible New Worker (unsubscribed)"},{"id":"va.audiences.divisadero_divisaderoweb_113","name":"VOC Viewer"},{"id":"va.audiences.divisadero_divisaderoweb_104","name":"Complete new User"},{"id":"va.audiences.divisadero_divisaderoweb_112","name":"Social Analytics Viewer"},{"id":"va.audiences.divisadero_divisaderoweb_103","name":"Testing Viewer"},{"id":"va.audiences.divisadero_divisaderoweb_106","name":"TMs Viewer"},{"id":"va.audiences.divisadero_divisaderoweb_105","name":"Google ID"},{"id":"va.audiences.divisadero_divisaderoweb_108","name":"Super Blog Viewer"},{"id":"va.audiences.divisadero_divisaderoweb_107","name":"Blog Actualidad Viewer"},{"id":"va.audiences.divisadero_divisaderoweb_111","name":"Enterprise Reporting Viewer"},{"id":"va.audiences.divisadero_divisaderoweb_110","name":"CEM Viewer"}];
-            var audiencesAssigned = [];
-            for(var i = 0; i < utagDataAudiencesIds.length; i++){
-                var audienceAssigned = utag.data[utagDataAudiencesIds[i].id];
-                if(audienceAssigned){
-                    audiencesAssigned.push(utagDataAudiencesIds[i].name);
-                }
-            }
-            return audiencesAssigned;
-        },
-        "trigger": "asDataLoaded",
-        "type": "array"
-    },
-    {
-        name: "pageInfo.postTitle",
+    }, {
+        name: "pageInfo.post",
         details: "Contiene el título asociada al post que se está visualizando",
         extractor: function() {
             var _self = this;
-            return _self.utils.cleanText(jQuery('.post_content h2').text());
-        },
-        trigger: "blogPost",
-        type: "string"
-    }, {
-        name: "pageInfo.postCategory",
-        details: "Contiene la categoria asociada al post que se está visualizando",
-        extractor: function() {
-            var _self = this;
-            return _self.utils.cleanText(jQuery('.post_category a:last').text());
-        },
-        trigger: "blogPost",
-        type: "string"
-    }, {
-        name: "pageInfo.postTags",
-        details: "Contiene las etiquetas asociadas al post que se está visualizando",
-        extractor: function() {
-            var _self = this;
-            var tagElements = jQuery('.single_tags a');
-            var tagsArray = [];
-            for (var i = 0; i < tagElements.length; i++) {
-                tagsArray.push(_self.utils.cleanText(tagElements[i].innerHTML));
+            if (_self.data.pageInfo.pageType === _self.data.constants.pageType.BLOG && jQuery('.blog_single').length > 0) {
+                var getPostTags = function() {
+                    var tagElements = jQuery('.single_tags a');
+                    var tagsArray = [];
+                    for (var i = 0; i < tagElements.length; i++) {
+                        tagsArray.push(_self.utils.cleanText(tagElements[i].innerHTML));
+                    }
+                    return tagsArray;
+                }
+                var postDetail = {
+                    title: _self.utils.cleanText(jQuery('.post_content h2').text()),
+                    category: _self.utils.cleanText(jQuery('.post_category a:last').text()),
+                    tags: getPostTags,
+                    date: utag_data['post_date'],
+                    author: _self.utils.cleanText(jQuery('.post_author a').text())
+                }
+                return postDetail;
             }
-            return tagsArray;
         },
-        trigger: "blogPost",
-        type: "array"
-    }, {
-        name: "pageInfo.postAuthor",
-        details: "Contiene el autor del post",
-        extractor: function() {
-            var _self = this;
-            return _self.utils.cleanText(jQuery('.post_author a').text());
-        },
-        trigger: "blogPost",
+        trigger: "dataFilled.pageInfo.pageType",
+        obligatory: true,
         type: "string"
     }, {
-        name: "pageInfo.postDate",
-        details: "Contiene la fecha de publicación del post",
+        name: "pageInfo.postImpressions",
+        details: "Contiene el título asociada al post que se está visualizando",
         extractor: function() {
             var _self = this;
-            return utag_data['post_date'];
+            var postList = [];
+            //getting home post
+            jQuery('.latest_post_holder .clearfix').each(function(index) {
+                var postPosition = parseInt(index) + 1;
+                var postDate = _self.utils.cleanText(jQuery(this).find('.actualidad-fecha').text());
+                //5 porque es la distancia entre las 4 cifras del año más el espacio
+                postDateCommaPosition = postDate.length - 5;
+                postDate = postDate.substring(0,postDateCommaPosition) + ',' +postDate.substring(postDateCommaPosition,postDate.length);
+                var postDetail = {
+                    title: _self.utils.cleanText(jQuery(this).find('.latest_post_title').text()),
+                    category: _self.utils.cleanText(jQuery(this).find('.latest_post_categories a').eq(1).text()),
+                    date: postDate,
+                    list: _self.data.pageInfo.pageType,
+                    position: postPosition
+                };
+                postList.push(postDetail);
+
+            });
+
+            //getting post of a category page 
+
+            jQuery('article.type-post').each(function(index) {
+
+                if (jQuery(this).closest('.single-post').length === 0) {
+                    var postPosition = parseInt(index) + 1;
+                    var postDate = _self.utils.cleanText(jQuery(this).find('.time').text());
+                    var postDetail = {
+                        title: _self.utils.cleanText(jQuery(this).find('.post_text h4').text()),
+                        category: _self.utils.cleanText(jQuery(this).find('.latest_post_categories a').eq(1).text()),
+                        date: _self.utils.cleanText(jQuery(this).find('.time').text().replace(',', '')).replace('publicado: ',''),
+                        author: _self.utils.cleanText(jQuery(this).find('.post_author span').eq(1).text()),
+                        list: _self.data.pageInfo.pageType,
+                        position: postPosition
+                    };
+
+                    postList.push(postDetail);
+                }
+            })
+            //getting post list in a search page
+            if(_self.data.pageInfo.pageType == _self.data.constants.pageType.BLOG_SEARCH){
+                jQuery('article .post_image').parent().each(function(index) {
+                    var postPosition = parseInt(index) + 1;
+                    var postDetail = {
+                        title: _self.utils.cleanText(jQuery(this).find('.post_content h2').text()),
+                        category: _self.utils.cleanText(jQuery(this).find('.post_category a').text()),
+                        date: _self.utils.cleanText(jQuery(this).find('.post_info .time').text()),
+                        author: _self.utils.cleanText(jQuery(this).find('.post_author_link').text()),
+                        list: _self.data.pageInfo.pageType,
+                        position: postPosition
+                    };
+                    postList.push(postDetail);
+
+                });
+            }
+
+            return postList;
+
         },
-        trigger: "blogPost",
+        trigger: "ready",
+        obligatory: true,
         type: "string"
     }, {
         name: "pageInfo.referrer",
         details: "Contiene el referente a la página actual",
         extractor: function() {
-            return document.referrer;
+            return document.location.referrer;
+        },
+        trigger: "preloader",
+        obligatory: true,
+        type: "string"
+    }, {
+        name: "pageInfo.url",
+        details: "Contiene la URL de la página actual",
+        extractor: function() {
+            return document.location.href;
         },
         trigger: "preloader",
         type: "string"
     }],
-
-    debug: function() {
-        var _self = this;
-        return (_self.data.configuration.tealiumEnviroment && _self.data.configuration.tealiumEnviroment != "prod");
-    },
     utils: [{
+        name: "uid",
+        util: function() {
+            return Math.floor((1 + Math.random()) * 0x100000000).toString();
+        }
+    }, {
         name: "getTealiumEnviroment",
         util: function() {
             var _self = this;
@@ -715,7 +1405,35 @@ var tagManagerSettings = {
                 results = regex.exec(location.search);
             return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
         }
-    }]
+    }, {
+        name: "scriptLoad",
+        util: function(srcScript, callback) {
+            var argumentos = Array.prototype.slice.call(arguments);
+            var script = document.createElement('script');
+            script.src = srcScript;
+            var head = document.getElementsByTagName('head')[0];
+            var done = false;
+            script.onload = script.onreadystatechange = function() {
+                if (!done && (!this.readyState || this.readyState == 'loaded' || this.readyState == 'complete')) {
+                    done = true;
+                    if (typeof(callback) == "function") {
+                        var argumentosSobrantes = 2;
+                        argumentos.splice(0, argumentosSobrantes);
+                        callback.apply(window, argumentos);
+                    }
+                    script.onload = script.onreadystatechange = null;
+                    head.removeChild(script);
+                }
+            };
+            head.appendChild(script);
+        }
+    }],
+    debug: function() {
+        var _self = this;
+        return (_self.data.configuration.tealiumEnviroment && _self.data.configuration.tealiumEnviroment != "prod");
+    },
+    tealium: true,
+    tealiumObject: utag
 };
 
 window.tagManager = new TagManager(tagManagerSettings);
