@@ -158,7 +158,7 @@ Aqui podremos encontrar que datos se han o no rellenado de los establecidos cóm
 - Capacidad para definir eventos cómo obligatorios
 	- Definir la clave `eventDependent` para asociarla a los datas
 - Introducir el concepto Super Eventos y Super Datas para definir varios datas y varios events de manera simultanea
-- Visualizador gráfico de 
+- Visualizador gráfico del objeto de configuración 
 
 
 

@@ -98,6 +98,7 @@ var tagManagerSettings = {
     }, {
         name: "ssCompleteSubmit",
         details: "Evento que se lanza cuando un usuario hace un submit del formulario de suscripción de la StaySharp completo (el que tiene twitter, cargo y empresa). Pasa como parámetros twitter, company y job",
+        params:["twitter","company","job"],
         listener: function() {
             var _self = this;
             jQuery('.wpcf7-submit').on('mousedown', function() {
@@ -108,6 +109,15 @@ var tagManagerSettings = {
             });
         },
         trigger: "ready"
+    },{
+        name: "ssEmailEntered",
+        details: "Evento que se lanza recogiendo el tipo de recuadro y el email (es igual que ssCompleteSubmit pero cambia la paremitración del evento) cuando un usuario hace un submit del formulario de suscripción de la StaySharp completo (el que tiene twitter, cargo y empresa). Pasa como parámetros twitter, company y job",
+        listener: function() {
+            var _self = this;
+           
+                _self.emit("ssEmailEntered", jQuery('.wpcf7-email').val(), "staySharp subscribed");
+        },
+        trigger: "ssCompleteSubmit"
     }, {
         name: "user.headerLinks",
         details: "Evento que se genera cuando se pulsa sobre alguno de los enlaces superiores [twitter, youtube, mail, etc.]. OJO: no hacen referencia al menú de secciones de la web",
@@ -150,20 +160,47 @@ var tagManagerSettings = {
     }, {
         name: "contactFormSubmitted",
         details: "Evento que se genera cuando se detecta que un usuario ha realizado un submit del formulario de contacto de una de las landings",
+        params: ["eventType","email","company"],
         listener: function() {
             var _self = this;
+            var email, company;
 
             if (jQuery('.wpcf7-form').length > 0) {
+                jQuery('.wpcf7-submit').on('click',function(){
+                    email = jQuery('.wpcf7-email').val();
+                    company = jQuery('.wpcf7-form-control[name="empresa"]').val();
+                });
                 var subscriptionInterval = setInterval(function() {
                     if (jQuery('.wpcf7-mail-sent-ok:visible').length > 0) {
-                        _self.emit('contactFormSubmitted');
                         clearInterval(subscriptionInterval);
+                        _self.emit('contactFormSubmitted', email, company);
+
                     }
                 }, 300);
+            }else if(_self.data.pageInfo.pageName == "seccion principal:contacto"){
+                jQuery('#contact-form #email').on('mousedown',function(){
+                    email = jQuery('#contact-form #email').val();
+                })
             }
         },
         trigger: "ready"
     }, {
+        name: "user.emailChanged",
+        details: "Se dispara cuando otro evento quiere cambiar el email asociado al userId",
+        params: ["eventType","pageName","email"],
+        listener: function(email, eventType) {
+            var _self = this;
+            var validEmail = _self.utils.checkEmail(email);
+            if (validEmail) {
+                var cemail = btoa(email);
+                _self.log("email changed: " + email);
+                localStorage.setItem('userId', cemail);
+                eventType = eventType || 'unknown';
+                _self.emit("user.emailChanged", eventType, _self.data.pageInfo.pageName, cemail);
+            }
+        },
+        trigger: ["contactFormSubmitted", "subscribeBlog","ssEmailEntered"]
+    },{
         name: "user.contactFormLink",
         details: "Evento que se genera cuando se hace clic sobre el botón \"contactanos\" del bloque inferior presente en casi todas las páginas del portal",
         params: ["placement", "buttonText", "href"],
@@ -177,7 +214,7 @@ var tagManagerSettings = {
         },
         trigger: "ready"
     }, {
-        name: "user.socialFooterLinks",
+        name: "social.socialFooterLinks",
         details: "Evento que se genera cuando se hace clic sobre alguno de los enlaces sociales que aparecen en la parte inferior de la página",
         params: ["placement", "buttonText", "href"],
         listener: function() {
@@ -496,6 +533,30 @@ var tagManagerSettings = {
         },
         trigger: "ready"
     }, {
+        name: "user.download",
+        details: "Evento que se genera cuando se clic en la descarga de un documento",
+        params: ["category", "type", "documentName"],
+        listener: function() {
+            var _self = this;
+            jQuery('[href*=".pdf"]').on('click', function() {
+                var articleName = _self.data.pageInfo.post.title || _self.data.pageInfo.pageName;
+                _self.emit("user.download", "descarga", "paper", articleName);
+            });
+        },
+        trigger: "ready"
+    }, {
+        name: "user.webinar",
+        details: "Evento que se genera cuando un usuario hace clic sobre el registro de un webinar",
+        params: ["category", "type", "webinarName"],
+        listener: function() {
+            var _self = this;
+            jQuery('[href*="gotowebinar.com/register"]').on('click', function() {
+                var articleName = _self.data.pageInfo.post.title || _self.data.pageInfo.pageName;
+                _self.emit("user.webinar", "registro", "webinar", articleName);
+            });
+        },
+        trigger: "ready"
+    }, {
         name: "user.blogTags",
         details: "Evento que se genera cuando se hace clic sobre alguno de los tags dentro de la nube de tags",
         params: ["placement", "buttonText", "href"],
@@ -532,7 +593,7 @@ var tagManagerSettings = {
             var _self = this;
             var postDataListener = function(postIndex) {
                     return function() {
-                        _self.emit("postClick", _self.data.pageInfo.postList[postIndex]);
+                        _self.emit("postClick", _self.data.pageInfo.postImpressions[postIndex]);
                     }
                 }
                 //Post en la home
@@ -560,6 +621,46 @@ var tagManagerSettings = {
                 var selector = basicSelector + ' ' + elementType[i].selector;
                 jQuery(selector).each(function(index, element) {
                     jQuery(this).on('mousedown', postDataListener(index));
+                });
+            }
+        },
+        trigger: "ready"
+    }, {
+        name: "socialSharing",
+        details: "Usuario pulsa sobre el botón de compartir en las redes sociales de los post",
+        params: ["socialNetwork", "pageName"],
+        listener: function(pageType) {
+            var _self = this;
+            var socialNetwork = [{
+                name: "twitter",
+                class: "twitter_share"
+            }, {
+                name: "linkedin",
+                class: "linkedin_share"
+            }, {
+                name: "facebook",
+                class: "facebook_share"
+            }, {
+                name: "google+",
+                class: "google_share"
+            }, {
+                name: "pinterest",
+                class: "pinterest_share"
+            }];
+            for (var j = 0; j < socialNetwork.length; j++) {
+                jQuery("article .post_social ." + socialNetwork[j].class).each(function() {
+                    var $socialButton = jQuery(this);
+                    var $closestArticle = $socialButton.closest('article');
+                    if ($closestArticle.find(':header').length > 0) {
+                        var placement = _self.utils.cleanText($closestArticle.find(':header').first().text());
+                        var network = socialNetwork[j].name;
+                        console.log(placement);
+                        $socialButton.click((function(network, placement) {
+                            return function() {
+                                _self.emit("socialSharing", network, placement, _self.data.pageInfo.pageName);
+                            };
+                        })(network, placement));
+                    }
                 });
             }
         },
@@ -611,6 +712,14 @@ var tagManagerSettings = {
         trigger: "preloader",
         obligatory: true,
         type: "string"
+    }, {
+        name: "configuration.sitecatalyst.s_account",
+        details: "Contiene el ID de la cuenta de la report suite de Adobe Analytics",
+        extractor: function() {
+            return "geo1xxdivisadero";
+        },
+        trigger: 'preloader',
+        obligatory: true
     }, {
         name: "configuration.gaAccount.fingerprint",
         details: "Contiene el ID de la cuenta de Google Analytics a la que se va a hacer el envío con el userId como fingerprint",
@@ -702,6 +811,7 @@ var tagManagerSettings = {
         name: "userInfo.campaign.medium",
         details: "Almacena el medio de la campaña",
         extractor: function() {
+            var _self = this;
             return _self.utils.getParameterByName("utm_medium");
         },
         trigger: "preloader",
@@ -711,6 +821,7 @@ var tagManagerSettings = {
         name: "userInfo.campaign.term",
         details: "Almacena las palabras clave de la campaña",
         extractor: function() {
+            var _self = this;
             return _self.utils.getParameterByName("utm_term");
         },
         trigger: "preloader",
@@ -720,6 +831,7 @@ var tagManagerSettings = {
         name: "userInfo.campaign.content",
         details: "Almacena el contenido de la campaña para diferenciar los anuncios o enlaces que llevan a la misma URL",
         extractor: function() {
+            var _self = this;
             return _self.utils.getParameterByName("utm_content");
         },
         trigger: "preloader",
@@ -729,10 +841,20 @@ var tagManagerSettings = {
         name: "userInfo.campaign.name",
         details: "Almacena el nombre de la campaña",
         extractor: function() {
+            var _self = this;
             return _self.utils.getParameterByName("utm_campaign");
         },
         trigger: "preloader",
         obligatory: true,
+        type: "string"
+    }, {
+        name: "userInfo.company",
+        details: "Almacena la compañia a la que pertenece el usuario",
+        extractor: function() {
+            var _self = this;
+            return _self.data.events.contactFormSubmitted.company || _self.data.events.ssCompleteSubmit.company;
+        },
+        trigger: ["ssCompleteSubmit","contactFormSubmitted"],
         type: "string"
     }, {
         name: "pageInfo.pageType",
@@ -1077,7 +1199,7 @@ var tagManagerSettings = {
         name: "userInfo.device.type",
         details: "Tipo de dispositivo extraido del User Agent",
         extractor: function(uaParsed) {
-            return uaParsed.device.type;
+            return uaParsed.device.type || "desktop";
         },
         trigger: "uaParser",
         obligatory: true,
@@ -1177,6 +1299,13 @@ var tagManagerSettings = {
                 }
                 return postDetail;
             }
+            return {
+                title: "",
+                category: "",
+                tags: "",
+                date: "",
+                author: ""
+            }
         },
         trigger: "dataFilled.pageInfo.pageType",
         obligatory: true,
@@ -1193,7 +1322,7 @@ var tagManagerSettings = {
                 var postDate = _self.utils.cleanText(jQuery(this).find('.actualidad-fecha').text());
                 //5 porque es la distancia entre las 4 cifras del año más el espacio
                 postDateCommaPosition = postDate.length - 5;
-                postDate = postDate.substring(0,postDateCommaPosition) + ',' +postDate.substring(postDateCommaPosition,postDate.length);
+                postDate = postDate.substring(0, postDateCommaPosition) + ',' + postDate.substring(postDateCommaPosition, postDate.length);
                 var postDetail = {
                     title: _self.utils.cleanText(jQuery(this).find('.latest_post_title').text()),
                     category: _self.utils.cleanText(jQuery(this).find('.latest_post_categories a').eq(1).text()),
@@ -1209,27 +1338,27 @@ var tagManagerSettings = {
 
             jQuery('article.type-post').each(function(index) {
 
-                if (jQuery(this).closest('.single-post').length === 0) {
-                    var postPosition = parseInt(index) + 1;
-                    var postDate = _self.utils.cleanText(jQuery(this).find('.time').text());
-                    var postDetail = {
-                        title: _self.utils.cleanText(jQuery(this).find('.post_text h4').text()),
-                        category: _self.utils.cleanText(jQuery(this).find('.latest_post_categories a').eq(1).text()),
-                        date: _self.utils.cleanText(jQuery(this).find('.time').text().replace(',', '')).replace('publicado: ',''),
-                        author: _self.utils.cleanText(jQuery(this).find('.post_author span').eq(1).text()),
-                        list: _self.data.pageInfo.pageType,
-                        position: postPosition
-                    };
+                    if (jQuery(this).closest('.single-post').length === 0) {
+                        var postPosition = parseInt(index) + 1;
+                        var postDate = _self.utils.cleanText(jQuery(this).find('.time').text());
+                        var postDetail = {
+                            title: _self.utils.cleanText(jQuery(this).find('.post_text :header').first().text()),
+                            category: _self.utils.cleanText(jQuery(this).find('.latest_post_categories a').eq(1).text()),
+                            date: _self.utils.cleanText(jQuery(this).find('.time').text().replace(',', '')).replace('publicado: ', ''),
+                            author: _self.utils.cleanText(jQuery(this).find('.post_author span').eq(1).text()),
+                            list: _self.data.pageInfo.pageType,
+                            position: postPosition
+                        };
 
-                    postList.push(postDetail);
-                }
-            })
-            //getting post list in a search page
-            if(_self.data.pageInfo.pageType == _self.data.constants.pageType.BLOG_SEARCH){
+                        postList.push(postDetail);
+                    }
+                })
+                //getting post list in a search page
+            if (_self.data.pageInfo.pageType == _self.data.constants.pageType.BLOG_SEARCH) {
                 jQuery('article .post_image').parent().each(function(index) {
                     var postPosition = parseInt(index) + 1;
                     var postDetail = {
-                        title: _self.utils.cleanText(jQuery(this).find('.post_content h2').text()),
+                        title: _self.utils.cleanText(jQuery(this).find('.post_content :header').first().text()),
                         category: _self.utils.cleanText(jQuery(this).find('.post_category a').text()),
                         date: _self.utils.cleanText(jQuery(this).find('.post_info .time').text()),
                         author: _self.utils.cleanText(jQuery(this).find('.post_author_link').text()),
@@ -1261,6 +1390,14 @@ var tagManagerSettings = {
         details: "Contiene la URL de la página actual",
         extractor: function() {
             return document.location.href;
+        },
+        trigger: "preloader",
+        type: "string"
+    }, {
+        name: "pageInfo.timestamp",
+        details: "Marca temporal de la carga de la página",
+        extractor: function() {
+            return new Date().getTime();
         },
         trigger: "preloader",
         type: "string"
@@ -1426,6 +1563,12 @@ var tagManagerSettings = {
                 }
             };
             head.appendChild(script);
+        }
+    },{
+        name: "checkEmail",
+        util: function(email) {
+            var emailRegexp = new RegExp(/^[-a-z0-9~!$%^&*_=+}{\'?]+(\.[-a-z0-9~!$%^&*_=+}{\'?]+)*@([a-z0-9_][-a-z0-9_]*(\.[-a-z0-9_]+)*\.(aero|arpa|biz|com|coop|edu|gov|info|int|mil|museum|name|net|org|pro|travel|mobi|[a-z][a-z])|([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}))(:[0-9]{1,5})?$/i);
+            return emailRegexp.test(email);
         }
     }],
     debug: function() {
