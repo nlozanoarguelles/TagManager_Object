@@ -15,13 +15,13 @@ Este componente tiene cómo objetivo almacenar todos los datos asociados al data
 Los campos necesarios para la definición de un data son:
 
 ``` json
-{ 
-	"name":"myData",
-	"details": "descripción del contenido",
-	"extractor": "función que recupera el dato",
-	"type": "tipo del dato contenido",
-	"obligatory":"flag que indica si es un dato obligatorio",
-	"priority":"prioridad de la ejecución del extractor"
+{
+    "name":"myData",
+    "details": "descripción del contenido",
+    "extractor": "función que recupera el dato",
+    "type": "tipo del dato contenido",
+    "obligatory":"flag que indica si es un dato obligatorio",
+    "priority":"prioridad de la ejecución del extactor. mas alta se ejecuta antes"
 }
 
 ```
@@ -33,12 +33,12 @@ Son los motores de la ejecución de todas las acciones vinculadas a las instanci
 Los campos necesarios para la definición de un event son:
 
 ``` json
-{ 
-	"name":"customEvent",
-	"details": "descripción del evento",
-	"listener": "función escuchadora del evento personalizado",
-	"trigger": "evento bajo el cual se ejecuta la función escuchadora",
-	"params":"datos a pasar si hay algo escuchando el evento"
+{
+    "name":"customEvent",
+    "details": "descripción del evento",
+    "listener": "función escuchadora del evento personalizado",
+    "trigger": "evento bajo el cual se ejecuta la función escuchadora",
+    "params":"datos a pasar si hay algo escuchando el evento"
 }
 ```
 
@@ -57,9 +57,9 @@ Se corresponden con todas las funciones utiles que se quieren utilizar de manera
 
 ``` json
 { 
-	"name":"myFunction",
-	"details": "descripción de la funcion",
-	"utils": "función a modo de plugin"
+    "name":"myFunction",
+    "details": "descripción de la funcion",
+    "utils": "función a modo de plugin"
 }
 
 ```
@@ -112,25 +112,59 @@ A continuación se listan las funciones vinculadas al uso de la librería
 
 Se utiliza para la emisión de eventos, será lo que permita la creación de triggers
 
+```javascript
+tagManager.emit('mievento.subtipo', parametro1, parametro2, parametro3);
+```
+
 ## on()
 
 Permite fijar escuchadores a los eventos emitidos
+
+```javascript
+tagManager.on('mievento.subtipo', function(parametro1, parametro2, parametro3){
+    // utilizar aqui los parametros adjuntos al evento
+});
+```
 
 ## onMany()
 
 Permite escuchar varios eventos de manera simultanea
 
+```javascript
+tagManager.onMany(['mievEnto.tipoA','otroEvento.tipoB'], function(parametro1, parametro2, parametro3){
+    // utilizar aqui los parametros adjuntos al evento
+});
+```
+
+
+
 ## log()
 
 Cuando la variable de configuración debug está activa, permite sacar mensajes de log por consola
+
+```javascript
+tagManager.log('Este mensaje se mostrara si se activa la variable de debug');
+```
 
 ## error()
 
 Cuando la variable de configuración debug está activa, permite sacar mensajes de error por consola
 
+```javascript
+try{
+    // codigo que podría producir errores
+} catch(e) {
+    tagManager.error(e,'Este mensaje se mostrara si se activa la variable de debug');
+}
+```
+
 ## clear()
 
 Permite partir de cero en la configuración del objeto `tagManager`
+
+```javascript
+tagManager.clear();
+```
 
 
 # Atributos del objeto
@@ -156,11 +190,6 @@ Aqui podremos encontrar que datos se han o no rellenado de los establecidos cóm
 - Capacidad para desuscribirse de un evento
 - Capacidad para limitar el número de eventos que se van a ejecutar por cada escuchador
 - Capacidad para definir eventos cómo obligatorios
-	- Definir la clave `eventDependent` para asociarla a los datas
+- Definir la clave `eventDependent` para asociarla a los datas
 - Introducir el concepto Super Eventos y Super Datas para definir varios datas y varios events de manera simultanea
 - Visualizador gráfico del objeto de configuración 
-
-
-
-
-
