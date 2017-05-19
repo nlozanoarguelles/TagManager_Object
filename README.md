@@ -185,11 +185,11 @@ Aqui podremos encontrar que datos se han o no rellenado de los establecidos cóm
 
 # Roadmap
 
-- Definir varios niveles de prioridad para cada Trigger de manera independiente
-- Definir una clave `evaluator` para comprobar que el contenido del data tiene la estructura correcta
-- Capacidad para desuscribirse de un evento
-- Capacidad para limitar el número de eventos que se van a ejecutar por cada escuchador
-- Capacidad para definir eventos cómo obligatorios
-- Definir la clave `eventDependent` para asociarla a los datas
-- Introducir el concepto Super Eventos y Super Datas para definir varios datas y varios events de manera simultanea
-- Visualizador gráfico del objeto de configuración 
+- [ ] Definir varios niveles de prioridad para cada Trigger de manera independiente
+- [ ] Definir una clave `evaluator` para comprobar que el contenido del data tiene la estructura correcta
+- [ ] Capacidad para desuscribirse de un evento
+- [ ] Capacidad para limitar el número de eventos que se van a ejecutar por cada escuchador
+- [ ] Capacidad para definir eventos cómo obligatorios
+- [ ] Definir la clave `eventDependent` para asociarla a los datas
+- [ ] Introducir el concepto Super Eventos y Super Datas para definir varios datas y varios events de manera simultanea
+- [ ] Visualizador gráfico del objeto de configuración 
