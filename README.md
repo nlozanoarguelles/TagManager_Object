@@ -193,3 +193,4 @@ Aqui podremos encontrar que datos se han o no rellenado de los establecidos cóm
 - [ ] Definir la clave `eventDependent` para asociarla a los datas
 - [ ] Introducir el concepto Super Eventos y Super Datas para definir varios datas y varios events de manera simultanea
 - [ ] Visualizador gráfico del objeto de configuración 
+- [ ] Comprobar que el arbol de eventos no tiene bucles
