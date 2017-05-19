@@ -187,7 +187,7 @@ Aqui podremos encontrar que datos se han o no rellenado de los establecidos cóm
 
 - [ ] Definir varios niveles de prioridad para cada Trigger de manera independiente
 - [ ] Definir una clave `evaluator` para comprobar que el contenido del data tiene la estructura correcta
-- [ ] Capacidad para desuscribirse de un evento
+- [x] ~~Capacidad para desuscribirse de un evento~~
 - [ ] Capacidad para limitar el número de eventos que se van a ejecutar por cada escuchador
 - [ ] Capacidad para definir eventos cómo obligatorios
 - [ ] Definir la clave `eventDependent` para asociarla a los datas
